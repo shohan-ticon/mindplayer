@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trace Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FAF7F0; --card:#FFFDF8; --inset:#F2ECE0; --code-bg:#FFFDF8;
+  --ink:#211E18; --ink-2:#6B655A; --faint:#E7E0D2;
+  --accent:#0F6E56; --accent-soft:#0F6E5618; --accent-line:#0F6E5640;
+  --amber:#9C5A12; --amber-bg:#F6E6CE; --amber-line:#BA751755;
+  --purple:#7B4B9F; --purple-bg:#7B4B9F18; --purple-line:#7B4B9F55;
+  --shadow:0 1px 2px rgba(40,33,20,.05),0 8px 28px rgba(40,33,20,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#1A1815; --card:#221F1B; --inset:#2A2620; --code-bg:#1E1B17;
+    --ink:#ECE6DA; --ink-2:#A39C8C; --faint:#332E26;
+    --accent:#5BC6A1; --accent-soft:#5BC6A11f; --accent-line:#5BC6A150;
+    --amber:#E6AE5C; --amber-bg:#3A2E1C; --amber-line:#E6AE5c44;
+    --purple:#C39BE6; --purple-bg:#C39BE61f; --purple-line:#C39BE655;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:"Hanken Grotesk",system-ui,sans-serif; font-size:15px; line-height:1.55;
+  display:flex; flex-direction:column; height:100vh; overflow:hidden;
+}
+header{
+  display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;
+  padding:20px 28px 14px; border-bottom:1px solid var(--faint);
+}
+header h1{
+  font-family:"Fraunces",serif; font-weight:600; font-size:24px; margin:0;
+  letter-spacing:-.01em;
+}
+header .sub{color:var(--ink-2); font-size:13.5px; margin-right:auto}
+.loadbtn{
+  font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink);
+  background:var(--card); border:1px solid var(--faint); border-radius:9px;
+  padding:7px 13px; cursor:pointer; text-decoration:none; display:inline-block;
+  transition:border-color .15s,transform .05s;
+}
+.loadbtn:hover{border-color:var(--accent-line)}
+.loadbtn:active{transform:translateY(1px)}
+.kbd{color:var(--ink-2); font-size:12px; display:flex; gap:10px; align-items:center}
+.kbd b{font:500 11px "JetBrains Mono",monospace; background:var(--inset);
+  border:1px solid var(--faint); border-radius:5px; padding:1px 6px; color:var(--ink)}
+
+/* Records dropdown */
+.records-menu{ position:relative }
+.records-list{
+  position:absolute; top:calc(100% + 6px); right:0;
+  background:var(--card); border:1px solid var(--faint); border-radius:9px;
+  box-shadow:var(--shadow); min-width:340px; max-height:60vh; overflow-y:auto;
+  z-index:1000; display:none;
+}
+.records-list.open{ display:block }
+.records-empty{ padding:18px; color:var(--ink-2); font-size:13px; text-align:center; line-height:1.5 }
+.records-empty code{ font-family:"JetBrains Mono",monospace; font-size:12px;
+  background:var(--inset); padding:2px 6px; border-radius:4px }
+.record-row{ display:flex; align-items:center; gap:10px; padding:9px 12px;
+  cursor:pointer; border-top:1px solid var(--faint); transition:background .15s }
+.record-row:first-child{ border-top:none }
+.record-row:hover{ background:var(--inset) }
+.record-row.active{ background:var(--accent-soft) }
+.record-row .info{ flex:1; min-width:0 }
+.record-name{ font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:1px 2px;
+  border-radius:3px; outline:none }
+.record-name[contenteditable="true"]:focus{ background:var(--paper);
+  outline:1px solid var(--accent); outline-offset:0 }
+.record-meta{ font:400 11px "JetBrains Mono",monospace; color:var(--ink-2);
+  margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.record-del{ background:none; border:none; color:var(--ink-2); cursor:pointer;
+  font-size:18px; line-height:1; padding:2px 8px; border-radius:5px }
+.record-del:hover{ color:#c92a2a; background:var(--inset) }
+.records-hint{ padding:8px 12px; border-top:1px solid var(--faint);
+  font:400 11px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  background:var(--inset) }
+
+main{
+  flex:1; min-height:0; display:grid; grid-template-columns:1fr 1.35fr; gap:20px;
+  padding:20px 28px; max-width:1480px; width:100%; margin:0 auto;
+}
+@media (max-width:860px){
+  main{grid-template-columns:1fr; overflow-y:auto}
+  body{overflow:auto; height:auto; min-height:100vh}
+}
+.panel{ background:var(--card); border:1px solid var(--faint);
+  border-radius:14px; box-shadow:var(--shadow); overflow:hidden;
+  display:flex; flex-direction:column; min-height:0 }
+.panel .cap{ font:600 11.5px "Hanken Grotesk",sans-serif; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--accent); padding:13px 16px 8px;
+  border-bottom:1px solid var(--faint); background:var(--inset); flex:none }
+.panel > *:not(.cap){ overflow:auto; min-height:0 }
+
+/* code (left) */
+.panel.source{ overflow:hidden }
+#code{ flex:1; font-family:"JetBrains Mono",monospace; font-size:13px; line-height:1.85;
+  padding:10px 6px 14px; background:var(--code-bg); overflow:auto }
+.row{ display:flex; align-items:center; white-space:pre; position:relative;
+  padding:0 14px 0 0; transition:background .25s ease }
+.row .ln{ width:38px; text-align:right; padding-right:14px; color:var(--ink-2);
+  opacity:.55; user-select:none; flex:none }
+.row .src{ flex:1 }
+.row.cur{ background:var(--accent-soft) }
+.row.cur .ln{ opacity:1; color:var(--accent); font-weight:700 }
+.row .bar{ position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent;
+  transition:background .25s }
+.row.cur .bar{ background:var(--accent) }
+.row.cur-exc{ background:#c92a2a22 }
+.row.cur-exc .ln{ opacity:1; color:#c92a2a; font-weight:700 }
+.row.cur-exc .bar{ background:#c92a2a }
+
+#status .tag.exception{ background:#c92a2a22; color:#c92a2a }
+#status .exc-msg{ color:#c92a2a; font-weight:600 }
+
+/* simulator (right) */
+.legend{ display:flex; gap:16px; align-items:center; flex-wrap:wrap;
+  padding:10px 16px; border-bottom:1px solid var(--faint);
+  background:var(--card); flex:none; font:500 11px "Hanken Grotesk",sans-serif;
+  color:var(--ink-2); letter-spacing:.04em; text-transform:uppercase }
+.legend .item{ display:inline-flex; align-items:center; gap:6px }
+.legend .swatch{ display:inline-block; width:14px; height:14px; border-radius:4px;
+  background:var(--card); border:1px solid var(--faint) }
+.legend .swatch.statement{ background:var(--card) }
+.legend .swatch.loop{ background:var(--inset); border-color:var(--faint) }
+.legend .swatch.branch{ background:var(--paper) }
+.legend .swatch.active{ background:var(--accent-soft); border-color:var(--accent) }
+.legend .swatch.extcall{ background:var(--purple-bg); border-color:var(--purple) }
+.legend .gly{ font:600 12px "JetBrains Mono",monospace; color:var(--ink) }
+
+#status{ padding:9px 16px; border-bottom:1px solid var(--faint);
+  background:var(--paper); flex:none;
+  font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink);
+  min-height:36px; display:flex; align-items:center; gap:8px }
+#status .tag{ font:600 10px "JetBrains Mono",monospace; padding:2px 7px;
+  border-radius:5px; background:var(--accent-soft); color:var(--accent);
+  letter-spacing:.05em; text-transform:uppercase }
+#status .tag.assign{ background:var(--amber-bg); color:var(--amber) }
+#status .tag.extcall{ background:var(--purple-bg); color:var(--purple) }
+
+#canvas-wrap{ flex:1; overflow:auto; padding:18px }
+#canvas{ display:block }
+.empty-msg{ color:var(--ink-2); font:400 14px "Hanken Grotesk",sans-serif;
+  padding:24px; text-align:center }
+
+/* SVG element styles */
+.frame-bg{ fill:var(--card); stroke:var(--faint); stroke-width:1 }
+.frame-bg.active{ stroke:var(--accent); stroke-width:1.5 }
+.frame-label{ font:600 13px "JetBrains Mono",monospace; fill:var(--ink) }
+.frame-sub{ font:400 11px "Hanken Grotesk",sans-serif; fill:var(--ink-2); letter-spacing:.05em; text-transform:uppercase }
+
+.loop-bg{ fill:var(--inset); stroke:var(--faint); stroke-width:1; transition:fill .2s,stroke .2s }
+.loop-bg.active{ fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5 }
+.loop-label, .branch-label{ font:500 12px "JetBrains Mono",monospace; fill:var(--ink) }
+
+.branch-bg{ fill:var(--paper); stroke:var(--faint); stroke-width:1; transition:fill .2s,stroke .2s }
+.branch-bg.active{ fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5 }
+
+.stmt-bg{ fill:var(--card); stroke:var(--faint); stroke-width:1; transition:fill .2s,stroke .2s }
+.stmt-bg.active{ fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5 }
+.stmt-label{ font:500 12px "JetBrains Mono",monospace; fill:var(--ink) }
+.stmt-label.muted{ fill:var(--ink-2) }
+
+.flow-arrow{ stroke:var(--ink-2); stroke-width:1.2; opacity:.55; fill:none }
+.flow-arrow-head{ fill:var(--ink-2); opacity:.7 }
+.flow-arrow.active{ stroke:var(--accent); opacity:1 }
+.flow-arrow-head.active{ fill:var(--accent); opacity:1 }
+
+.gly{ font:600 13px "JetBrains Mono",monospace; fill:var(--ink-2) }
+.gly.loop{ fill:var(--accent) }
+.gly.branch{ fill:var(--amber) }
+
+.badge-bg{ fill:var(--card); stroke:var(--accent-line); stroke-width:1 }
+.badge-text{ font:500 10.5px "JetBrains Mono",monospace; fill:var(--accent) }
+
+.taken-bg{ fill:var(--accent-soft); stroke:var(--accent-line); stroke-width:1 }
+.taken-text{ font:500 10.5px "JetBrains Mono",monospace; fill:var(--accent) }
+
+.var-bg{ fill:var(--inset); stroke:var(--faint); stroke-width:1; transition:fill .25s,stroke .25s }
+.var-bg.arg{ fill:var(--amber-bg); stroke:var(--amber-line) }
+.var-bg.changed{ fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5 }
+.var-name{ font:500 11.5px "JetBrains Mono",monospace; fill:var(--ink-2) }
+.var-value{ font:500 11.5px "JetBrains Mono",monospace; fill:var(--ink) }
+.var-value.redacted{ font-style:italic; fill:var(--ink-2) }
+
+.extcall-bg{ fill:var(--purple-bg); stroke:var(--purple-line); stroke-width:1 }
+.extcall-label{ font:600 10.5px "JetBrains Mono",monospace; fill:var(--purple); letter-spacing:.06em; text-transform:uppercase }
+.extcall-text{ font:500 11.5px "JetBrains Mono",monospace; fill:var(--ink) }
+.extcall-arrow{ fill:none; stroke:var(--purple); stroke-width:1.5; marker-end:url(#arrow) }
+
+/* transport */
+footer{ position:sticky; bottom:0; background:var(--card);
+  border-top:1px solid var(--faint); padding:13px 28px;
+  display:flex; align-items:center; gap:16px; box-shadow:0 -6px 22px rgba(40,33,20,.05) }
+.tbtn{ width:38px; height:38px; border-radius:10px; border:1px solid var(--faint);
+  background:var(--paper); color:var(--ink); cursor:pointer; font-size:15px;
+  display:flex; align-items:center; justify-content:center; transition:border-color .15s,transform .05s }
+.tbtn:hover{ border-color:var(--accent-line) }
+.tbtn:active{ transform:translateY(1px) }
+.tbtn.play{ background:var(--accent); color:#fff; border-color:var(--accent); width:46px }
+@media (prefers-color-scheme:dark){ .tbtn.play{ color:#10221C } }
+#scrub{ flex:1; accent-color:var(--accent); height:4px; cursor:pointer }
+.count{ font:500 13px "JetBrains Mono",monospace; color:var(--ink-2);
+  min-width:96px; text-align:right }
+.count b{ color:var(--ink) }
+.speed{ font:500 12px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  background:var(--paper); border:1px solid var(--faint); border-radius:8px;
+  padding:6px 8px; cursor:pointer }
+</style>
+</head>
+<body>
+<header>
+  <h1>Trace Simulator</h1>
+  <span class="sub">flow drawing &middot; record once &middot; replay anywhere</span>
+  <a class="loadbtn" href="player.html">&uarr; Text view</a>
+  <a class="loadbtn" href="call_graph.html">&uarr; Call graph</a>
+  <a class="loadbtn" href="event_graph.html">&uarr; Event graph</a>
+  <a class="loadbtn" href="record.html" style="border-color:var(--accent-line); color:var(--accent)">+ New record</a>
+  <button class="loadbtn" id="jump-exc" hidden title="Jump to the next exception"
+          style="color:#c92a2a; border-color:#c92a2a55">&#9888; 0 exceptions</button>
+  <div class="records-menu">
+    <button class="loadbtn" id="records-btn">Records &#x25BE;</button>
+    <div class="records-list" id="records-list"></div>
+  </div>
+  <button class="loadbtn" id="load">Load trace.json</button>
+  <input type="file" id="file" accept=".json" hidden>
+  <span class="kbd"><b>&larr;</b><b>&rarr;</b> step <b>space</b> play</span>
+</header>
+
+<main>
+  <section class="panel source">
+    <div class="cap">Source</div>
+    <div id="code"></div>
+  </section>
+  <section class="panel">
+    <div class="cap">Simulator</div>
+    <div class="legend">
+      <span class="item"><span class="swatch statement"></span>step</span>
+      <span class="item"><span class="gly">⟳</span>loop</span>
+      <span class="item"><span class="gly">◇</span>decision</span>
+      <span class="item"><span class="swatch active"></span>now</span>
+      <span class="item"><span class="swatch extcall"></span>extcall</span>
+    </div>
+    <div id="status">&nbsp;</div>
+    <div id="canvas-wrap">
+      <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="currentColor"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <button class="tbtn" id="back" title="Step back (&larr;)">&#9664;</button>
+  <button class="tbtn play" id="play" title="Play / pause (space)">&#9658;</button>
+  <button class="tbtn" id="fwd" title="Step forward (&rarr;)">&#9654;</button>
+  <input type="range" id="scrub" min="0" value="0">
+  <select class="speed" id="speed" title="Playback speed">
+    <option value="700">0.5&times;</option>
+    <option value="380" selected>1&times;</option>
+    <option value="180">2&times;</option>
+    <option value="70">4&times;</option>
+  </select>
+  <span class="count">step <b id="cur">0</b> / <span id="tot">0</span></span>
+</footer>
+
+<script>
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// Off-screen SVG used to measure text width for variable-width labels.
+const _ms = document.createElementNS(SVG_NS, 'svg');
+_ms.setAttribute('width','0'); _ms.setAttribute('height','0');
+_ms.style.position='absolute'; _ms.style.visibility='hidden';
+const _mt = document.createElementNS(SVG_NS, 'text');
+_mt.setAttribute('class','loop-label');
+_ms.appendChild(_mt);
+document.body.appendChild(_ms);
+function measure(s, cls){
+  _mt.setAttribute('class', cls || 'loop-label');
+  _mt.textContent = s;
+  return _mt.getBBox().width;
+}
+function svg(tag, attrs, parent){
+  const e = document.createElementNS(SVG_NS, tag);
+  if(attrs) for(const k in attrs) e.setAttribute(k, attrs[k]);
+  if(parent) parent.appendChild(e);
+  return e;
+}
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+let trace = {events:[],session:{}}, events = [], lines = [], cur = 0, timer = null;
+let structureByFile = {}, primaryFile = null;
+let funcByName = {}, childrenByParent = {};
+let exceptionSeqs = [];
+
+function load(t){
+  if(!t || !Array.isArray(t.events)){
+    alert('That JSON does not look like a trace. Expected an object with an "events" array.');
+    return;
+  }
+  trace = t;
+  events = t.events;
+  lines = ((t.session && t.session.source) || '').replace(/\n$/,'').split('\n');
+  structureByFile = (t.session && t.session.structure_by_file) || {};
+  primaryFile = Object.keys(structureByFile)[0] || null;
+  funcByName = {}; childrenByParent = {};
+  const nodes = primaryFile ? structureByFile[primaryFile] : [];
+  for(const n of nodes){
+    if(n.kind === 'function') funcByName[n.name] = n;
+    const key = n.parent || '__root__';
+    (childrenByParent[key] = childrenByParent[key] || []).push(n);
+  }
+  cur = 0;
+  exceptionSeqs = events.filter(e => e.type === 'exception').map(e => e.seq);
+  document.getElementById('tot').textContent = Math.max(events.length-1, 0);
+  document.getElementById('scrub').max = Math.max(events.length-1, 0);
+  const excBtn = document.getElementById('jump-exc');
+  if(excBtn){
+    if(exceptionSeqs.length){
+      excBtn.hidden = false;
+      excBtn.innerHTML = '⚠ ' + exceptionSeqs.length + ' exception' +
+                         (exceptionSeqs.length>1?'s':'');
+    } else { excBtn.hidden = true; }
+  }
+  renderCode();
+  render();
+}
+
+function renderCode(){
+  const el = document.getElementById('code');
+  el.innerHTML = lines.map((ln,i)=>(
+    '<div class="row" data-line="'+(i+1)+'"><span class="bar"></span>'+
+    '<span class="ln">'+(i+1)+'</span><span class="src">'+(esc(ln)||' ')+'</span></div>'
+  )).join('');
+}
+
+// Fold events[0..cur] into per-frame state. Innermost frame is last.
+function compute(){
+  const stack = [];
+  let changedHere = null, extcallHere = null;
+  const last = Math.min(cur, events.length-1);
+  for(let i=0; i<=last; i++){
+    const e = events[i];
+    if(!e) continue;
+    if(e.type === 'call'){
+      const fr = {seq:e.seq, func:e.func, line:e.line, depth:e.depth,
+                  vars:{}, lastLine:e.line, lastBranch:{}, loopIter:{}};
+      for(const k in (e.args||{})) fr.vars[k] = {value:e.args[k], kind:'arg', seq:e.seq};
+      stack.push(fr);
+    } else if(e.type === 'line'){
+      const f = stack[stack.length-1]; if(f) f.lastLine = e.line;
+    } else if(e.type === 'assign'){
+      const f = stack[stack.length-1]; if(!f) continue;
+      f.vars[e.var] = {value:e.value, kind:'assign', seq:e.seq, prev:e.prev};
+      if(i === cur) changedHere = {frameIndex:stack.length-1, name:e.var};
+    } else if(e.type === 'branch'){
+      const f = stack[stack.length-1]; if(!f) continue;
+      f.lastBranch[e.node_id] = e.taken;
+    } else if(e.type === 'loop'){
+      const f = stack[stack.length-1]; if(!f) continue;
+      f.loopIter[e.node_id] = e.iteration + 1;
+    } else if(e.type === 'return'){
+      stack.pop();
+    } else if(e.type === 'extcall'){
+      if(i === cur) extcallHere = e;
+    }
+  }
+  return {stack, changedHere, extcallHere, currentEvent: events[cur] || null};
+}
+
+// ---------------------------------------------------------------------------
+// SVG layout
+// ---------------------------------------------------------------------------
+const FRAME_W = 460;
+const VAR_COL_W = 260;
+const VAR_GAP = 14;
+const FRAME_PAD = 14;
+const FRAME_HEADER_H = 38;
+const NODE_HEADER_H = 32;
+const NODE_GAP = 18;       // includes vertical space for the flow arrow between siblings
+const NODE_INDENT = 18;
+const STMT_H = 34;
+const VAR_CHIP_H = 46;
+const VAR_CHIP_GAP = 8;
+const FRAME_GAP = 22;
+const ARROW_LEN = 12;      // visible arrow stroke length inside NODE_GAP
+
+function srcLine(lineno){ return (lines[lineno-1] || '').trim(); }
+function truncate(s, n){ return s.length > n ? s.slice(0, n-1) + '…' : s; }
+
+function isLineInside(node, line){
+  return line != null && node.lineno != null && node.end_lineno != null
+         && line >= node.lineno && line <= node.end_lineno;
+}
+
+// Draw a small vertical arrow connector between two stacked sibling nodes.
+function drawFlowArrow(parent, cx, topY, gapH, active){
+  const lineEnd = topY + gapH - 5;
+  const cls = 'flow-arrow' + (active ? ' active' : '');
+  svg('line', {x1:cx, y1:topY, x2:cx, y2:lineEnd, class:cls}, parent);
+  svg('polygon', {
+    points: `${cx-4},${lineEnd} ${cx+4},${lineEnd} ${cx},${lineEnd+5}`,
+    class: 'flow-arrow-head' + (active ? ' active' : '')
+  }, parent);
+}
+
+// A statement = a single rectangular step in the flow.
+function layoutStatement(node, frame){
+  function render(parent, x, y, w){
+    const active = isLineInside(node, frame.lastLine);
+    const g = svg('g', {transform:`translate(${x},${y})`}, parent);
+    svg('rect', {x:0, y:0, width:w, height:STMT_H, rx:6, ry:6,
+                 class:'stmt-bg' + (active ? ' active' : '')}, g);
+    const ln = srcLine(node.lineno) || '';
+    const txt = truncate(ln, Math.floor((w-22)/7));
+    svg('text', {x:12, y:21, class:'stmt-label' + (active ? '' : ' muted')}, g).textContent = txt;
+  }
+  return {height: STMT_H, render};
+}
+
+// Layout a branch/loop container. Recursively lays out children and stacks
+// them top-to-bottom with downward flow arrows in between.
+function layoutContainer(node, frame, widthAvail){
+  const children = (childrenByParent[node.id] || [])
+    .filter(c => c.kind !== 'function')
+    .sort((a,b)=>a.lineno-b.lineno);
+
+  const childW = widthAvail - NODE_INDENT - 12;
+  const layouts = children.map(c => ({node:c, lay: layoutNode(c, frame, childW)}));
+  const bodyH = layouts.reduce((sum, l, idx) =>
+    sum + l.lay.height + (idx>0 ? NODE_GAP : 0), 0);
+  const padTop = bodyH > 0 ? 8 : 0;
+  const padBottom = bodyH > 0 ? 12 : 0;
+  const height = NODE_HEADER_H + padTop + bodyH + padBottom;
+
+  function render(parent, x, y, w){
+    const isLoop = node.kind === 'loop';
+    const active = isLineInside(node, frame.lastLine);
+    const bgClass = (isLoop ? 'loop-bg' : 'branch-bg') + (active ? ' active' : '');
+    const g = svg('g', {transform:`translate(${x},${y})`}, parent);
+    svg('rect', {x:0, y:0, width:w, height:height, rx:9, ry:9, class:bgClass}, g);
+
+    // Header: icon glyph + source line
+    const gly = isLoop ? '⟳' : '◇';
+    const glyCls = 'gly ' + (isLoop ? 'loop' : 'branch');
+    svg('text', {x:12, y:22, class:glyCls}, g).textContent = gly;
+    const labelCls = isLoop ? 'loop-label' : 'branch-label';
+    const labelMax = w - 40 - (isLoop ? 60 : 70);
+    const labelText = truncate(srcLine(node.lineno) || node.id, Math.floor(labelMax / 7));
+    svg('text', {x:32, y:22, class:labelCls}, g).textContent = labelText;
+
+    // Right-side badge
+    if(isLoop){
+      const iter = frame.loopIter[node.id];
+      const txt = '⟳ ' + (iter != null ? iter : '–');
+      const bw = measure(txt, 'badge-text') + 16;
+      const bg = svg('g', {transform:`translate(${w-10-bw},7)`}, g);
+      svg('rect', {x:0, y:0, width:bw, height:18, rx:9, ry:9, class:'badge-bg'}, bg);
+      svg('text', {x:bw/2, y:13, class:'badge-text', 'text-anchor':'middle'}, bg).textContent = txt;
+    } else {
+      const taken = frame.lastBranch[node.id];
+      if(taken){
+        const txt = '✓ ' + taken;
+        const bw = measure(txt, 'taken-text') + 16;
+        const bg = svg('g', {transform:`translate(${w-10-bw},7)`}, g);
+        svg('rect', {x:0, y:0, width:bw, height:18, rx:9, ry:9, class:'taken-bg'}, bg);
+        svg('text', {x:bw/2, y:13, class:'taken-text', 'text-anchor':'middle'}, bg).textContent = txt;
+      }
+    }
+
+    // Children
+    const cw = w - NODE_INDENT - 12;
+    const arrowX = NODE_INDENT + cw/2;
+    let cy = NODE_HEADER_H + padTop;
+    for(let i = 0; i < layouts.length; i++){
+      const {lay, node: cnode} = layouts[i];
+      if(i > 0){
+        const arrowActive = isLineInside(cnode, frame.lastLine);
+        drawFlowArrow(g, arrowX, cy - NODE_GAP, NODE_GAP, arrowActive);
+      }
+      lay.render(g, NODE_INDENT, cy, cw);
+      cy += lay.height + NODE_GAP;
+    }
+  }
+
+  return {height, render};
+}
+
+// Dispatch by kind.
+function layoutNode(node, frame, widthAvail){
+  if(node.kind === 'statement') return layoutStatement(node, frame);
+  return layoutContainer(node, frame, widthAvail);
+}
+
+// Layout one stack frame. Returns {width, height, render(parent)}.
+function layoutFrame(frame, isInnermost, changedHereName){
+  const fn = funcByName[frame.func];
+  const children = fn ? (childrenByParent[fn.id] || [])
+                          .filter(c => c.kind !== 'function')
+                          .sort((a,b)=>a.lineno-b.lineno)
+                       : [];
+  const flowW = FRAME_W - 2*FRAME_PAD;
+  const layouts = children.map(c => ({node:c, lay: layoutNode(c, frame, flowW)}));
+  const flowH = layouts.reduce((sum, l, idx) =>
+    sum + l.lay.height + (idx>0 ? NODE_GAP : 0), 0);
+
+  const varNames = Object.keys(frame.vars);
+  const varsH = varNames.length * (VAR_CHIP_H + VAR_CHIP_GAP) - (varNames.length ? VAR_CHIP_GAP : 0);
+
+  const innerH = Math.max(flowH, varsH);
+  const totalH = FRAME_HEADER_H + 12 + innerH + FRAME_PAD;
+  const totalW = FRAME_W + VAR_GAP + VAR_COL_W;
+
+  function render(parent){
+    const g = svg('g', {}, parent);
+    // Frame background
+    svg('rect', {x:0, y:0, width:FRAME_W, height:totalH, rx:14, ry:14,
+                 class:'frame-bg' + (isInnermost ? ' active' : '')}, g);
+    // Frame header
+    const args = Object.keys(frame.vars).filter(n => frame.vars[n].kind === 'arg');
+    svg('text', {x:16, y:25, class:'frame-label'}, g).textContent =
+      frame.func + '(' + args.join(', ') + ')';
+    svg('text', {x:FRAME_W-14, y:25, class:'frame-sub', 'text-anchor':'end'}, g).textContent =
+      isInnermost ? 'now running' : 'caller';
+
+    // Structural body with arrows between siblings
+    const arrowX = FRAME_PAD + flowW/2;
+    let cy = FRAME_HEADER_H + 12;
+    for(let i = 0; i < layouts.length; i++){
+      const {lay, node: cnode} = layouts[i];
+      if(i > 0){
+        const arrowActive = isLineInside(cnode, frame.lastLine);
+        drawFlowArrow(g, arrowX, cy - NODE_GAP, NODE_GAP, arrowActive);
+      }
+      lay.render(g, FRAME_PAD, cy, flowW);
+      cy += lay.height + NODE_GAP;
+    }
+
+    // Variable chip column (two-row layout: name on top, value below)
+    let vy = FRAME_HEADER_H + 12;
+    for(const name of varNames){
+      const v = frame.vars[name];
+      const changed = changedHereName === name;
+      const isArg = v.kind === 'arg';
+      const chipCls = 'var-bg' + (changed ? ' changed' : (isArg ? ' arg' : ''));
+      const chipG = svg('g', {transform:`translate(${FRAME_W + VAR_GAP},${vy})`}, g);
+      svg('rect', {x:0, y:0, width:VAR_COL_W, height:VAR_CHIP_H, rx:10, ry:10, class:chipCls}, chipG);
+      // Row 1: variable name + arg/changed tag
+      svg('text', {x:12, y:18, class:'var-name'}, chipG).textContent = name;
+      if(isArg){
+        svg('text', {x:VAR_COL_W-12, y:18, 'text-anchor':'end', class:'var-name'}, chipG)
+          .textContent = 'arg';
+      }
+      // Row 2: value
+      const repr = (v.value && v.value.repr) != null ? String(v.value.repr) : '';
+      const isRed = v.value && v.value.redacted;
+      const valEl = svg('text', {x:12, y:36, class:'var-value' + (isRed ? ' redacted' : '')}, chipG);
+      valEl.textContent = truncate(repr, 32);
+      vy += VAR_CHIP_H + VAR_CHIP_GAP;
+    }
+  }
+
+  return {width: totalW, height: totalH, render};
+}
+
+// Plain-English description of the current event (drives the #status bar).
+function explain(e){
+  if(!e) return '';
+  const valRepr = v => (v && v.redacted) ? '<hidden>' : truncate(String(v && v.repr != null ? v.repr : ''), 40);
+  switch(e.type){
+    case 'call': {
+      const args = Object.entries(e.args || {})
+        .map(([k,v]) => k + '=' + valRepr(v)).join(', ');
+      return ['call', `Entering ${e.func}(${args})`];
+    }
+    case 'return': {
+      return ['return', `Finishing ${e.func || ''} — returns ${valRepr(e.value)}`];
+    }
+    case 'line': {
+      const ln = (lines[e.line-1] || '').trim();
+      return ['line', `Running line ${e.line}: ${truncate(ln, 70)}`];
+    }
+    case 'assign': {
+      if(!e.prev) return ['assign', `Set ${e.var} to ${valRepr(e.value)}`];
+      return ['assign', `Change ${e.var} from ${valRepr(e.prev)} to ${valRepr(e.value)}`];
+    }
+    case 'branch':
+      return ['branch', `Decision — taking the "${e.taken}" path`];
+    case 'loop':
+      return ['loop', `Loop iteration #${(e.iteration||0)+1}`];
+    case 'extcall':
+      return ['extcall', `Calling out: ${e.verb} ${e.target} → ${e.status} in ${e.duration_ms}ms`];
+    case 'exception':
+      return ['exception',
+        `⚠ ${e.exc_type || 'Exception'}: ${e.message || ''}  ·  in ${e.func || ''} on line ${e.line}`];
+  }
+  return ['', e.type];
+}
+
+function render(){
+  const svgEl = document.getElementById('canvas');
+  // Wipe everything except <defs>
+  [...svgEl.childNodes].forEach(n => { if(n.nodeName !== 'defs') svgEl.removeChild(n); });
+
+  const {stack, changedHere, extcallHere, currentEvent} = compute();
+
+  // Left-side source highlight (red for exception, accent otherwise)
+  document.querySelectorAll('.row.cur, .row.cur-exc').forEach(r => {
+    r.classList.remove('cur'); r.classList.remove('cur-exc');
+  });
+  if(currentEvent && currentEvent.line){
+    const r = document.querySelector('.row[data-line="'+currentEvent.line+'"]');
+    if(r){
+      r.classList.add(currentEvent.type === 'exception' ? 'cur-exc' : 'cur');
+      r.scrollIntoView({block:'nearest'});
+    }
+  }
+
+  // Plain-English status line
+  const statusEl = document.getElementById('status');
+  if(currentEvent){
+    const [tag, msg] = explain(currentEvent);
+    statusEl.innerHTML = '<span class="tag '+esc(tag)+'">'+esc(tag||'event')+'</span> '+esc(msg);
+  } else {
+    statusEl.innerHTML = events.length ? 'Ready — press play or step ▶' : 'Load a trace.json to begin.';
+  }
+
+  if(!stack.length){
+    const g = svg('g', {transform:'translate(20,40)'}, svgEl);
+    svg('text', {x:0, y:0, class:'frame-sub'}, g).textContent =
+      events.length ? 'Execution finished.' : 'No trace loaded — click "Load trace.json".';
+    svgEl.setAttribute('width', 400);
+    svgEl.setAttribute('height', 80);
+    svgEl.setAttribute('viewBox', '0 0 400 80');
+  } else {
+    // Innermost on top: render bottom-up in stack order, BUT we want innermost at y=0.
+    // Walk innermost -> outermost.
+    let y = 0;
+    let maxW = 0;
+    const frameLayouts = [];
+    for(let i = stack.length - 1; i >= 0; i--){
+      const isInner = i === stack.length - 1;
+      const changedName = (changedHere && changedHere.frameIndex === i) ? changedHere.name : null;
+      const fl = layoutFrame(stack[i], isInner, changedName);
+      frameLayouts.push({fl, y});
+      y += fl.height + FRAME_GAP;
+      if(fl.width > maxW) maxW = fl.width;
+    }
+    for(const {fl, y: fy} of frameLayouts){
+      const wrap = svg('g', {transform:`translate(0,${fy})`}, svgEl);
+      fl.render(wrap);
+    }
+    // Extcall card
+    let extW = 0;
+    if(extcallHere){
+      const cardLines = [
+        (extcallHere.verb || '') + ' ' + (extcallHere.target || ''),
+        '→ ' + (extcallHere.status != null ? extcallHere.status : '?')
+        + (extcallHere.duration_ms != null ? ' in ' + extcallHere.duration_ms + 'ms' : '')
+      ];
+      const cardW = Math.max(measure(cardLines[0], 'extcall-text'),
+                             measure(cardLines[1], 'extcall-text'),
+                             measure('EXTCALL', 'extcall-label')) + 28;
+      const cardH = 60;
+      const cardX = maxW + 30;
+      const cardY = 10;
+      const card = svg('g', {transform:`translate(${cardX},${cardY})`}, svgEl);
+      svg('rect', {x:0, y:0, width:cardW, height:cardH, rx:8, ry:8, class:'extcall-bg'}, card);
+      svg('text', {x:14, y:18, class:'extcall-label'}, card).textContent = 'EXTCALL';
+      svg('text', {x:14, y:36, class:'extcall-text'}, card).textContent = truncate(cardLines[0], 40);
+      svg('text', {x:14, y:52, class:'extcall-text'}, card).textContent = cardLines[1];
+      // Arrow from innermost frame's right edge to the card
+      const arrowG = svg('g', {color:'var(--purple)'}, svgEl);
+      svg('path', {d:`M${maxW} 30 L${cardX-4} 30`, class:'extcall-arrow'}, arrowG);
+      extW = cardW + 40;
+    }
+    svgEl.setAttribute('width', maxW + extW + 8);
+    svgEl.setAttribute('height', Math.max(y, 80));
+    svgEl.setAttribute('viewBox', `0 0 ${maxW + extW + 8} ${Math.max(y, 80)}`);
+  }
+
+  document.getElementById('cur').textContent = cur;
+  document.getElementById('scrub').value = cur;
+}
+
+// ---------------------------------------------------------------------------
+// Transport controls
+// ---------------------------------------------------------------------------
+function go(i){ cur = Math.max(0, Math.min(events.length-1, i)); render(); }
+function step(d){ pause(); go(cur+d); }
+function play(){
+  if(timer) return pause();
+  if(cur >= events.length-1) cur = 0;
+  document.getElementById('play').innerHTML='&#10073;&#10073;';
+  const tick = () => {
+    if(cur >= events.length-1){ pause(); return; }
+    go(cur+1);
+    timer = setTimeout(tick, +document.getElementById('speed').value);
+  };
+  timer = setTimeout(tick, +document.getElementById('speed').value);
+}
+function pause(){ if(timer){ clearTimeout(timer); timer=null; } document.getElementById('play').innerHTML='&#9658;'; }
+
+document.getElementById('back').onclick = () => step(-1);
+document.getElementById('fwd').onclick = () => step(1);
+document.getElementById('jump-exc').addEventListener('click', () => {
+  if(!exceptionSeqs.length) return;
+  const next = exceptionSeqs.find(s => s > cur);
+  pause();
+  go(next != null ? next : exceptionSeqs[0]);
+});
+document.getElementById('play').onclick = play;
+document.getElementById('scrub').oninput = e => { pause(); go(+e.target.value); };
+document.getElementById('load').onclick = () => document.getElementById('file').click();
+document.getElementById('file').onchange = ev => {
+  const f = ev.target.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try { load(JSON.parse(rd.result)); }
+    catch(err){ alert('Could not parse trace: ' + err.message); }
+  };
+  rd.readAsText(f);
+};
+window.addEventListener('keydown', e => {
+  if(e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if(e.key === 'ArrowRight'){ step(1); e.preventDefault(); }
+  else if(e.key === 'ArrowLeft'){ step(-1); e.preventDefault(); }
+  else if(e.key === ' '){ play(); e.preventDefault(); }
+  else if(e.key === 'Home'){ pause(); go(0); }
+  else if(e.key === 'End'){ pause(); go(events.length-1); }
+});
+
+// Initial render: empty trace, prompts the user to load.
+render();
+
+// Auto-load via ?trace=<path> or ?id=<library-id>.
+(function autoload(){
+  const url = new URL(window.location.href);
+  const id = url.searchParams.get('id');
+  if(id){
+    fetch('/api/traces/' + encodeURIComponent(id))
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(load)
+      .catch(err => console.error('autoload by id failed', err));
+    return;
+  }
+  const tracePath = url.searchParams.get('trace');
+  if(!tracePath) return;
+  fetch(tracePath).then(r => r.json()).then(load).catch(err => {
+    console.error('autoload failed', err);
+  });
+})();
+
+// Records dropdown (library browser). Talks to /api/traces.
+(function setupRecords(){
+  const btn = document.getElementById('records-btn');
+  const list = document.getElementById('records-list');
+  if(!btn || !list) return;
+  let records = [];
+  let activeId = new URL(location.href).searchParams.get('id') || null;
+
+  function escHtml(s){ return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;'); }
+  function shortPath(p){
+    if(!p) return '';
+    return p.length > 42 ? '…' + p.slice(-41) : p;
+  }
+
+  async function refresh(){
+    try{
+      const r = await fetch('/api/traces');
+      records = r.ok ? await r.json() : [];
+    } catch(e){ records = []; }
+    render();
+  }
+  function render(){
+    if(!records.length){
+      list.innerHTML = '<div class="records-empty">No saved records yet.<br>Run <code>tracesnap record &lt;file.py&gt;</code> to add one.</div>';
+      return;
+    }
+    list.innerHTML = records.map(r => {
+      const isActive = r.id === activeId;
+      return '<div class="record-row'+(isActive?' active':'')+'" data-id="'+escHtml(r.id)+'">' +
+        '<div class="info">' +
+          '<div class="record-name" data-id="'+escHtml(r.id)+'" contenteditable="true" spellcheck="false">'+escHtml(r.name)+'</div>' +
+          '<div class="record-meta">'+escHtml(r.created)+' · '+r.event_count+' events · '+escHtml(r.kind)+(r.source?' · '+escHtml(shortPath(r.source)):'')+'</div>' +
+        '</div>' +
+        '<button class="record-del" data-id="'+escHtml(r.id)+'" title="Delete">&times;</button>' +
+      '</div>';
+    }).join('') +
+    '<div class="records-hint">click a row to load · click the name to rename</div>';
+  }
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    list.classList.toggle('open');
+    if(list.classList.contains('open')) refresh();
+  });
+  document.addEventListener('click', e => {
+    if(!list.contains(e.target) && e.target !== btn) list.classList.remove('open');
+  });
+
+  list.addEventListener('click', async e => {
+    const del = e.target.closest('.record-del');
+    if(del){
+      e.stopPropagation();
+      if(!confirm('Delete this record? This cannot be undone.')) return;
+      await fetch('/api/traces/' + encodeURIComponent(del.dataset.id), {method:'DELETE'});
+      refresh();
+      return;
+    }
+    if(e.target.closest('.record-name')) return;
+    const row = e.target.closest('.record-row');
+    if(!row) return;
+    const id = row.dataset.id;
+    activeId = id;
+    try{
+      const r = await fetch('/api/traces/' + encodeURIComponent(id));
+      if(r.ok){
+        const trace = await r.json();
+        load(trace);
+        try{ history.replaceState(null, '', '?id=' + encodeURIComponent(id)); }catch(_){}
+      }
+    } catch(_){}
+    list.classList.remove('open');
+    render();
+  });
+
+  list.addEventListener('blur', async e => {
+    const nm = e.target.closest && e.target.closest('.record-name');
+    if(!nm) return;
+    const id = nm.dataset.id;
+    const newName = (nm.textContent || '').trim();
+    if(!newName) return;
+    const cur = records.find(r => r.id === id);
+    if(cur && cur.name === newName) return;
+    try{
+      await fetch('/api/traces/' + encodeURIComponent(id), {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name: newName})
+      });
+      refresh();
+    } catch(_){}
+  }, true);
+  list.addEventListener('keydown', e => {
+    if(e.target.classList && e.target.classList.contains('record-name') && e.key === 'Enter'){
+      e.preventDefault(); e.target.blur();
+    }
+  });
+})();
+</script>
+</body>
+</html>

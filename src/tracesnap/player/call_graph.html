@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trace Call Graph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FAF7F0; --card:#FFFDF8; --inset:#F2ECE0;
+  --ink:#211E18; --ink-2:#6B655A; --faint:#E7E0D2;
+  --accent:#0F6E56; --accent-soft:#0F6E5618; --accent-line:#0F6E5640;
+  --amber:#9C5A12; --amber-bg:#F6E6CE; --amber-line:#BA751755;
+  --purple:#7B4B9F; --purple-bg:#7B4B9F18; --purple-line:#7B4B9F55;
+  --shadow:0 1px 2px rgba(40,33,20,.05),0 8px 28px rgba(40,33,20,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#1A1815; --card:#221F1B; --inset:#2A2620;
+    --ink:#ECE6DA; --ink-2:#A39C8C; --faint:#332E26;
+    --accent:#5BC6A1; --accent-soft:#5BC6A11f; --accent-line:#5BC6A150;
+    --amber:#E6AE5C; --amber-bg:#3A2E1C; --amber-line:#E6AE5c44;
+    --purple:#C39BE6; --purple-bg:#C39BE61f; --purple-line:#C39BE655;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:"Hanken Grotesk",system-ui,sans-serif; font-size:15px; line-height:1.55;
+  display:flex; flex-direction:column; height:100vh; overflow:hidden;
+}
+header{
+  display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;
+  padding:20px 28px 14px; border-bottom:1px solid var(--faint);
+}
+header h1{
+  font-family:"Fraunces",serif; font-weight:600; font-size:24px; margin:0;
+  letter-spacing:-.01em;
+}
+header .sub{color:var(--ink-2); font-size:13.5px; margin-right:auto}
+.loadbtn{
+  font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink);
+  background:var(--card); border:1px solid var(--faint); border-radius:9px;
+  padding:7px 13px; cursor:pointer; text-decoration:none; display:inline-block;
+  transition:border-color .15s,transform .05s;
+}
+.loadbtn:hover{border-color:var(--accent-line)}
+.kbd{color:var(--ink-2); font-size:12px; display:flex; gap:10px; align-items:center}
+.kbd b{font:500 11px "JetBrains Mono",monospace; background:var(--inset);
+  border:1px solid var(--faint); border-radius:5px; padding:1px 6px; color:var(--ink)}
+
+/* Records dropdown */
+.records-menu{ position:relative }
+.records-list{
+  position:absolute; top:calc(100% + 6px); right:0;
+  background:var(--card); border:1px solid var(--faint); border-radius:9px;
+  box-shadow:var(--shadow); min-width:340px; max-height:60vh; overflow-y:auto;
+  z-index:1000; display:none;
+}
+.records-list.open{ display:block }
+.records-empty{ padding:18px; color:var(--ink-2); font-size:13px; text-align:center; line-height:1.5 }
+.records-empty code{ font-family:"JetBrains Mono",monospace; font-size:12px;
+  background:var(--inset); padding:2px 6px; border-radius:4px }
+.record-row{ display:flex; align-items:center; gap:10px; padding:9px 12px;
+  cursor:pointer; border-top:1px solid var(--faint); transition:background .15s }
+.record-row:first-child{ border-top:none }
+.record-row:hover{ background:var(--inset) }
+.record-row.active{ background:var(--accent-soft) }
+.record-row .info{ flex:1; min-width:0 }
+.record-name{ font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:1px 2px;
+  border-radius:3px; outline:none }
+.record-name[contenteditable="true"]:focus{ background:var(--paper);
+  outline:1px solid var(--accent); outline-offset:0 }
+.record-meta{ font:400 11px "JetBrains Mono",monospace; color:var(--ink-2);
+  margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.record-del{ background:none; border:none; color:var(--ink-2); cursor:pointer;
+  font-size:18px; line-height:1; padding:2px 8px; border-radius:5px }
+.record-del:hover{ color:#c92a2a; background:var(--inset) }
+.records-hint{ padding:8px 12px; border-top:1px solid var(--faint);
+  font:400 11px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  background:var(--inset) }
+
+main{
+  --col-src: 360px;
+  --col-det: 340px;
+  flex:1; min-height:0; display:grid;
+  grid-template-columns: var(--col-src) 8px 1fr 8px var(--col-det);
+  gap:14px; padding:18px 24px; max-width:1640px; width:100%; margin:0 auto;
+}
+@media (max-width:1200px){
+  main{ --col-src: 280px; --col-det: 300px; gap:12px; padding:14px 18px }
+}
+@media (max-width:860px){
+  main{ grid-template-columns:1fr; overflow-y:auto }
+  body{ overflow:auto; height:auto; min-height:100vh }
+  .dragger{ display:none }
+}
+
+/* Draggable dividers between columns */
+.dragger{ position:relative; cursor:col-resize; align-self:stretch;
+  display:flex; align-items:center; justify-content:center; user-select:none }
+.dragger::after{ content:''; width:2px; height:38px; border-radius:2px;
+  background:var(--faint); transition:background .15s }
+.dragger:hover::after, .dragger.dragging::after{ background:var(--accent); width:3px }
+.dragger::before{ content:''; position:absolute; top:0; bottom:0; left:-4px; right:-4px }  /* widened hit area */
+.panel{ background:var(--card); border:1px solid var(--faint);
+  border-radius:14px; box-shadow:var(--shadow); overflow:hidden;
+  display:flex; flex-direction:column; min-height:0 }
+.panel .cap{ font:600 11.5px "Hanken Grotesk",sans-serif; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--accent); padding:13px 16px 8px;
+  border-bottom:1px solid var(--faint); background:var(--inset); flex:none }
+
+/* source code panel (left) */
+.panel.source{ overflow:hidden }
+#code{ flex:1; font-family:"JetBrains Mono",monospace; font-size:12.5px; line-height:1.85;
+  padding:10px 6px 14px; background:var(--paper); overflow:auto }
+.row{ display:flex; align-items:center; white-space:pre; position:relative;
+  padding:0 14px 0 0; transition:background .25s ease }
+.row .ln{ width:38px; text-align:right; padding-right:14px; color:var(--ink-2);
+  opacity:.55; user-select:none; flex:none }
+.row .src{ flex:1 }
+.row.cur{ background:var(--accent-soft) }
+.row.cur .ln{ opacity:1; color:var(--accent); font-weight:700 }
+.row .bar{ position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent;
+  transition:background .25s }
+.row.cur .bar{ background:var(--accent) }
+.row.cur-exc{ background:#c92a2a22 }
+.row.cur-exc .ln{ opacity:1; color:#c92a2a; font-weight:700 }
+.row.cur-exc .bar{ background:#c92a2a }
+
+#status .tag.exception{ background:#c92a2a22; color:#c92a2a }
+#status .exc-msg{ color:#c92a2a; font-weight:600 }
+
+.legend{ display:flex; gap:16px; align-items:center; flex-wrap:wrap;
+  padding:10px 16px; border-bottom:1px solid var(--faint);
+  background:var(--card); flex:none; font:500 11px "Hanken Grotesk",sans-serif;
+  color:var(--ink-2); letter-spacing:.04em; text-transform:uppercase }
+.legend .item{ display:inline-flex; align-items:center; gap:6px }
+.legend .swatch{ display:inline-block; width:14px; height:14px; border-radius:50%;
+  border:1px solid var(--faint); background:var(--card) }
+.legend .swatch.active{ background:var(--accent-soft); border-color:var(--accent) }
+.legend .swatch.extcall{ background:var(--purple-bg); border-color:var(--purple) }
+.legend .swatch.multi{ background:var(--amber-bg); border-color:var(--amber) }
+
+#status{ padding:9px 16px; border-bottom:1px solid var(--faint);
+  background:var(--paper); flex:none;
+  font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink);
+  min-height:36px; display:flex; align-items:center; gap:8px }
+#status .tag{ font:600 10px "JetBrains Mono",monospace; padding:2px 7px;
+  border-radius:5px; background:var(--accent-soft); color:var(--accent);
+  letter-spacing:.05em; text-transform:uppercase }
+#status .hint{ color:var(--ink-2); margin-left:auto; font-size:12px }
+
+#canvas-wrap{ flex:1; overflow:hidden; padding:0; background:var(--paper);
+  position:relative; cursor:grab }
+#canvas-wrap.panning{ cursor:grabbing }
+#canvas{ display:block; width:100%; height:100%; cursor:inherit }
+
+/* Floating zoom toolbar */
+.zoom-bar{ position:absolute; top:10px; right:10px; z-index:10;
+  display:flex; align-items:center; gap:2px; padding:4px;
+  background:var(--card); border:1px solid var(--faint); border-radius:9px;
+  box-shadow:var(--shadow); user-select:none }
+.zoom-bar button{ width:30px; height:28px; border-radius:5px; border:none;
+  background:transparent; color:var(--ink); cursor:pointer;
+  font:600 14px "JetBrains Mono",monospace;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .15s }
+.zoom-bar button:hover{ background:var(--inset) }
+.zoom-bar button:active{ background:var(--accent-soft); color:var(--accent) }
+.zoom-bar #zoom-level{ font:500 11px "JetBrains Mono",monospace; color:var(--ink-2);
+  padding:0 6px; min-width:42px; text-align:center }
+
+/* SVG nodes / edges */
+.node-bg{ fill:var(--card); stroke:var(--faint); stroke-width:1.5; cursor:pointer;
+  transition:fill .2s,stroke .2s }
+.node-bg:hover{ stroke:var(--accent-line) }
+.node-bg.active{ fill:var(--accent-soft); stroke:var(--accent); stroke-width:2 }
+.node-bg.selected{ stroke:var(--accent); stroke-width:2.5 }
+.node-bg.multi{ stroke:var(--amber-line); stroke-width:1.5 }
+.node-bg.multi.active{ stroke:var(--accent); fill:var(--accent-soft) }
+.node-bg.extcall{ fill:var(--purple-bg); stroke:var(--purple-line) }
+.node-bg.extcall.active{ stroke:var(--purple); stroke-width:2 }
+.node-bg.entry{ fill:transparent; stroke:var(--faint); stroke-dasharray:4 3; cursor:default }
+.node-bg.entry:hover{ stroke:var(--faint) }
+.node-label.entry{ fill:var(--ink-2); font-weight:500 }
+.node-label{ font:600 13px "JetBrains Mono",monospace; fill:var(--ink); pointer-events:none }
+.node-sub{ font:500 10.5px "JetBrains Mono",monospace; fill:var(--ink-2); pointer-events:none }
+.node-bg.active + .node-label{ fill:var(--accent) }
+
+.edge{ fill:none; stroke:var(--ink-2); stroke-width:1.2; opacity:.45; transition:stroke .2s,opacity .2s }
+.edge.active{ stroke:var(--accent); stroke-width:2; opacity:1 }
+.edge.extcall{ stroke:var(--purple) }
+.edge.extcall.active{ stroke:var(--purple); stroke-width:2; opacity:1 }
+.edge-head{ fill:var(--ink-2); opacity:.55 }
+.edge-head.active{ fill:var(--accent); opacity:1 }
+.edge-head.extcall{ fill:var(--purple) }
+.edge-label-bg{ fill:var(--paper); stroke:var(--faint); stroke-width:1; rx:4; ry:4 }
+.edge-label{ font:500 10.5px "JetBrains Mono",monospace; fill:var(--ink) }
+.edge-label.muted{ fill:var(--ink-2) }
+.edge-label.in{ fill:var(--accent) }
+.edge-label.out{ fill:var(--amber) }
+
+/* Details side-panel (right column) */
+.details{ height:100%; display:flex; flex-direction:column; overflow:hidden }
+.details .cap{ display:flex; align-items:center; justify-content:space-between }
+.details .cap button{ font:500 11px "Hanken Grotesk",sans-serif;
+  background:var(--card); border:1px solid var(--faint); border-radius:7px;
+  padding:3px 10px; cursor:pointer; color:var(--ink-2) }
+.details .body{ flex:1; overflow-y:auto; padding:14px 16px }
+.details .empty{ color:var(--ink-2); font-size:13px; padding:14px 0 }
+.details h3{ margin:0 0 8px; font:600 16px "JetBrains Mono",monospace; color:var(--ink) }
+.details .summary{ font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  margin-bottom:14px }
+.invocation{ border:1px solid var(--faint); border-radius:10px; padding:10px 12px;
+  margin-bottom:10px; background:var(--paper); transition:border-color .15s }
+.invocation:hover{ border-color:var(--accent-line) }
+.invocation.active{ border-color:var(--accent); background:var(--accent-soft) }
+.invocation .head{ display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:6px }
+.invocation .head .seq{ font:600 11px "JetBrains Mono",monospace; color:var(--accent) }
+.invocation .head .scrubto{ font:500 11px "Hanken Grotesk",sans-serif;
+  background:var(--card); border:1px solid var(--faint); border-radius:6px;
+  padding:2px 8px; cursor:pointer; color:var(--ink) }
+.invocation .head .scrubto:hover{ border-color:var(--accent-line) }
+.kv{ display:grid; grid-template-columns: 70px 1fr; gap:4px 10px;
+  font:500 12px "JetBrains Mono",monospace; margin:2px 0 }
+.kv .k{ color:var(--ink-2) }
+.kv .v{ color:var(--ink); word-break:break-all }
+.kv .v.redacted{ font-style:italic; color:var(--ink-2) }
+.kv .v.amber{ color:var(--amber) }
+.kv .v.accent{ color:var(--accent) }
+.varlist{ margin-top:6px; padding-top:6px; border-top:1px dashed var(--faint) }
+.varlist .lbl{ font:500 10.5px "Hanken Grotesk",sans-serif; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--ink-2); margin-bottom:4px }
+
+/* transport */
+footer{ position:sticky; bottom:0; background:var(--card);
+  border-top:1px solid var(--faint); padding:13px 28px;
+  display:flex; align-items:center; gap:16px;
+  box-shadow:0 -6px 22px rgba(40,33,20,.05) }
+.tbtn{ width:38px; height:38px; border-radius:10px; border:1px solid var(--faint);
+  background:var(--paper); color:var(--ink); cursor:pointer; font-size:15px;
+  display:flex; align-items:center; justify-content:center;
+  transition:border-color .15s,transform .05s }
+.tbtn:hover{ border-color:var(--accent-line) }
+.tbtn:active{ transform:translateY(1px) }
+.tbtn.play{ background:var(--accent); color:#fff; border-color:var(--accent); width:46px }
+@media (prefers-color-scheme:dark){ .tbtn.play{ color:#10221C } }
+#scrub{ flex:1; accent-color:var(--accent); height:4px; cursor:pointer }
+.count{ font:500 13px "JetBrains Mono",monospace; color:var(--ink-2);
+  min-width:96px; text-align:right }
+.count b{ color:var(--ink) }
+.speed{ font:500 12px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  background:var(--paper); border:1px solid var(--faint); border-radius:8px;
+  padding:6px 8px; cursor:pointer }
+</style>
+</head>
+<body>
+<header>
+  <h1>Call Graph</h1>
+  <span class="sub">who calls whom &middot; click a node for details</span>
+  <a class="loadbtn" href="player.html">&uarr; Text view</a>
+  <a class="loadbtn" href="simulator.html">&uarr; Flowchart view</a>
+  <a class="loadbtn" href="event_graph.html">&uarr; Event graph</a>
+  <a class="loadbtn" href="record.html" style="border-color:var(--accent-line); color:var(--accent)">+ New record</a>
+  <button class="loadbtn" id="jump-exc" hidden title="Jump to the next exception"
+          style="color:#c92a2a; border-color:#c92a2a55">&#9888; 0 exceptions</button>
+  <div class="records-menu">
+    <button class="loadbtn" id="records-btn">Records &#x25BE;</button>
+    <div class="records-list" id="records-list"></div>
+  </div>
+  <button class="loadbtn" id="load">Load trace.json</button>
+  <input type="file" id="file" accept=".json" hidden>
+  <span class="kbd"><b>&larr;</b><b>&rarr;</b> step <b>space</b> play</span>
+</header>
+
+<main>
+  <section class="panel source">
+    <div class="cap">Source</div>
+    <div id="code"></div>
+  </section>
+  <div class="dragger" data-side="src" title="Drag to resize"></div>
+  <section class="panel">
+    <div class="cap">Call graph</div>
+    <div class="legend">
+      <span class="item"><span class="swatch"></span>function</span>
+      <span class="item"><span class="swatch multi"></span>called &gt;1 time</span>
+      <span class="item"><span class="swatch active"></span>currently active</span>
+      <span class="item"><span class="swatch extcall"></span>external call</span>
+    </div>
+    <div id="status">&nbsp;</div>
+    <div id="canvas-wrap">
+      <div class="zoom-bar">
+        <button id="zoom-out" title="Zoom out (− key)">&minus;</button>
+        <span id="zoom-level">100%</span>
+        <button id="zoom-in" title="Zoom in (+ key)">+</button>
+        <button id="zoom-fit" title="Fit to view (0 key)">&#9974;</button>
+      </div>
+      <svg id="canvas" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </section>
+  <div class="dragger" data-side="det" title="Drag to resize"></div>
+  <section class="panel details">
+    <div class="cap">
+      <span>Details</span>
+      <button id="close-details" hidden>Close</button>
+    </div>
+    <div class="body" id="details-body">
+      <div class="empty">Click a node to see how that function was called and what it returned.</div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <button class="tbtn" id="back" title="Step back (&larr;)">&#9664;</button>
+  <button class="tbtn play" id="play" title="Play / pause (space)">&#9658;</button>
+  <button class="tbtn" id="fwd" title="Step forward (&rarr;)">&#9654;</button>
+  <input type="range" id="scrub" min="0" value="0">
+  <select class="speed" id="speed" title="Playback speed">
+    <option value="700">0.5&times;</option>
+    <option value="380" selected>1&times;</option>
+    <option value="180">2&times;</option>
+    <option value="70">4&times;</option>
+  </select>
+  <span class="count">step <b id="cur">0</b> / <span id="tot">0</span></span>
+</footer>
+
+<script>
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function svg(tag, attrs, parent){
+  const e = document.createElementNS(SVG_NS, tag);
+  if(attrs) for(const k in attrs) e.setAttribute(k, attrs[k]);
+  if(parent) parent.appendChild(e);
+  return e;
+}
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function truncate(s, n){ s = String(s||''); return s.length > n ? s.slice(0, n-1) + '…' : s; }
+
+let trace = null, events = [], lines = [], cur = 0, timer = null;
+let graph = {nodes: new Map(), edges: new Map(), entry: null};
+let positions = new Map();
+let selectedFunc = null;
+let activeStack = [];   // recomputed each render
+let graphW = 900, graphH = 600;
+let firstRender = true;
+const zoomState = {scale: 1, panX: 0, panY: 0};
+let exceptionSeqs = [];
+
+// -------------------------- Data extraction --------------------------
+
+// Walk every event, build:
+//   nodes: func -> { name, kind: 'function'|'extcall', invocations: [...] }
+//   edges: 'caller>callee' -> { from, to, kind, calls: [...] }
+// Each invocation records seq, callSeq, args, returnSeq, returnValue, locals.
+function buildCallGraph(events){
+  const nodes = new Map();
+  const edges = new Map();
+  const ROOT = '<entry>';   // synthetic script-level caller (parent of all top-level calls)
+  let hasAnyCall = false;
+  const stack = [];   // [{func, invocation}]
+
+  function getNode(name, kind){
+    if(!nodes.has(name)) nodes.set(name, {name, kind, invocations: []});
+    return nodes.get(name);
+  }
+  function getEdge(from, to, kind){
+    const key = from + '>' + to;
+    if(!edges.has(key)) edges.set(key, {from, to, kind, calls: []});
+    return edges.get(key);
+  }
+
+  for(const e of events){
+    if(e.type === 'call'){
+      const callerFunc = stack.length ? stack[stack.length-1].func : ROOT;
+      if(callerFunc === ROOT) getNode(ROOT, 'entry');
+      hasAnyCall = true;
+      const node = getNode(e.func, 'function');
+      const inv = {
+        callSeq: e.seq, returnSeq: null,
+        args: e.args || {}, returnValue: null,
+        caller: callerFunc, line: e.line,
+        locals: {},   // accumulated as assigns happen
+      };
+      node.invocations.push(inv);
+      const edge = getEdge(callerFunc, e.func, 'function');
+      edge.calls.push(inv);
+      stack.push({func: e.func, invocation: inv});
+    } else if(e.type === 'return'){
+      const top = stack.pop();
+      if(top){
+        top.invocation.returnSeq = e.seq;
+        top.invocation.returnValue = e.value;
+      }
+    } else if(e.type === 'assign'){
+      const top = stack[stack.length-1];
+      if(top) top.invocation.locals[e.var] = e.value;
+    } else if(e.type === 'extcall'){
+      const callerFunc = stack.length ? stack[stack.length-1].func : ROOT;
+      if(callerFunc === ROOT) getNode(ROOT, 'entry');
+      // External target: collapse to host so multiple GETs to same host group together.
+      let host = e.target || '';
+      try {
+        const u = new URL(e.target);
+        host = u.host;
+      } catch(_){ host = host.replace(/^https?:\/\//,'').split('/')[0]; }
+      const exName = '↗ ' + host;
+      const node = getNode(exName, 'extcall');
+      const inv = {
+        callSeq: e.seq, returnSeq: e.seq,
+        verb: e.verb, target: e.target, status: e.status,
+        duration_ms: e.duration_ms,
+        args: {}, returnValue: {repr: String(e.status), redacted: false},
+        caller: callerFunc, line: e.line, locals: {},
+      };
+      node.invocations.push(inv);
+      const edge = getEdge(callerFunc, exName, 'extcall');
+      edge.calls.push(inv);
+    }
+  }
+
+  return {nodes, edges, entry: hasAnyCall ? ROOT : null};
+}
+
+// Position nodes using BFS levels from the entry node.
+function layoutGraph(g){
+  const positions = new Map();
+  if(!g.nodes.size) return positions;
+  const levels = new Map();
+  levels.set(g.entry, 0);
+  const queue = [g.entry];
+  while(queue.length){
+    const cur = queue.shift();
+    const curLvl = levels.get(cur);
+    for(const [, edge] of g.edges){
+      if(edge.from === cur && !levels.has(edge.to)){
+        levels.set(edge.to, curLvl + 1);
+        queue.push(edge.to);
+      }
+    }
+  }
+  // Group by level
+  const byLevel = new Map();
+  for(const [name, lvl] of levels){
+    if(!byLevel.has(lvl)) byLevel.set(lvl, []);
+    byLevel.get(lvl).push(name);
+  }
+  // Spread within each level
+  const Y_GAP = 150;
+  const X_GAP = 220;
+  let maxLvl = 0;
+  for(const [lvl] of byLevel){ if(lvl > maxLvl) maxLvl = lvl; }
+  let maxWidth = 0;
+  for(const [, names] of byLevel){ if(names.length > maxWidth) maxWidth = names.length; }
+  const canvasW = Math.max(900, maxWidth * X_GAP + 120);
+  for(const [lvl, names] of byLevel){
+    const totalW = names.length * X_GAP;
+    const startX = (canvasW - totalW) / 2 + X_GAP/2;
+    for(let i = 0; i < names.length; i++){
+      positions.set(names[i], { x: startX + i * X_GAP, y: 60 + lvl * Y_GAP });
+    }
+  }
+  positions._canvasW = canvasW;
+  positions._canvasH = 80 + (maxLvl + 1) * Y_GAP;
+  return positions;
+}
+
+// Recompute the active call stack at the current step.
+function activeStackAt(cur){
+  const stack = [];
+  const last = Math.min(cur, events.length-1);
+  for(let i=0; i<=last; i++){
+    const e = events[i];
+    if(!e) continue;
+    if(e.type === 'call') stack.push({func: e.func, callSeq: e.seq});
+    else if(e.type === 'return') stack.pop();
+  }
+  return stack;
+}
+
+// -------------------------- Rendering --------------------------
+
+const NODE_W = 160;
+const NODE_H = 56;
+
+function load(t){
+  if(!t || !Array.isArray(t.events)){
+    alert('That JSON does not look like a trace. Need an "events" array.');
+    return;
+  }
+  trace = t;
+  events = t.events;
+  lines = ((t.session && t.session.source) || '').replace(/\n$/,'').split('\n');
+  cur = 0;
+  selectedFunc = null;
+  graph = buildCallGraph(events);
+  positions = layoutGraph(graph);
+  firstRender = true;             // re-fit graph after a fresh load
+  exceptionSeqs = events.filter(e => e.type === 'exception').map(e => e.seq);
+  const excBtn = document.getElementById('jump-exc');
+  if(excBtn){
+    if(exceptionSeqs.length){
+      excBtn.hidden = false;
+      excBtn.innerHTML = '⚠ ' + exceptionSeqs.length + ' exception' +
+                         (exceptionSeqs.length>1?'s':'');
+    } else { excBtn.hidden = true; }
+  }
+  document.getElementById('tot').textContent = Math.max(events.length-1, 0);
+  document.getElementById('scrub').max = Math.max(events.length-1, 0);
+  renderCode();
+  render();
+}
+
+function renderCode(){
+  const el = document.getElementById('code');
+  el.innerHTML = lines.map((ln,i)=>(
+    '<div class="row" data-line="'+(i+1)+'"><span class="bar"></span>'+
+    '<span class="ln">'+(i+1)+'</span><span class="src">'+(esc(ln)||' ')+'</span></div>'
+  )).join('');
+}
+
+function statusText(){
+  if(!events.length) return ['', 'Load a trace.json to begin.'];
+  const e = events[cur];
+  if(!e) return ['', 'Ready.'];
+  const top = activeStack[activeStack.length-1];
+  const where = top ? `inside ${top.func}` : 'between calls';
+  switch(e.type){
+    case 'call':    return ['call',    `Calling ${e.func}(…) at line ${e.line}`];
+    case 'return':  return ['return',  `Returning from ${e.func || '?'}`];
+    case 'extcall': return ['extcall', `External call: ${e.verb} ${e.target} → ${e.status}`];
+    case 'exception': return ['exception',
+      `⚠ ${e.exc_type || 'Exception'}: ${e.message || ''}  ·  in ${e.func || ''} on line ${e.line}`];
+    default:        return ['step',    `Step ${cur} — ${where}`];
+  }
+}
+
+function render(){
+  activeStack = activeStackAt(cur);
+  const activeNames = new Set(activeStack.map(f => f.func));
+  // Active edges = pairs of consecutive frames in the stack (entry→first, first→second, …)
+  const activeEdgeKeys = new Set();
+  let prev = '<entry>';
+  for(const f of activeStack){
+    activeEdgeKeys.add(prev + '>' + f.func);
+    prev = f.func;
+  }
+  // If current event is an extcall, also mark its outbound edge active
+  const curEv = events[cur];
+  if(curEv && curEv.type === 'extcall'){
+    const caller = activeStack.length ? activeStack[activeStack.length-1].func : '<entry>';
+    let host;
+    try { host = new URL(curEv.target).host; }
+    catch(_){ host = (curEv.target||'').replace(/^https?:\/\//,'').split('/')[0]; }
+    activeEdgeKeys.add(caller + '>↗ ' + host);
+  }
+
+  // status bar
+  const [tag, msg] = statusText();
+  document.getElementById('status').innerHTML =
+    '<span class="tag">'+esc(tag||'step')+'</span> '+esc(msg)+
+    '<span class="hint">click a node to see args / returns</span>';
+
+  // Source-line highlight (red for exception, accent otherwise)
+  document.querySelectorAll('.row.cur, .row.cur-exc').forEach(r => {
+    r.classList.remove('cur'); r.classList.remove('cur-exc');
+  });
+  const curEvForLine = events[cur];
+  if(curEvForLine && curEvForLine.line){
+    const r = document.querySelector('.row[data-line="'+curEvForLine.line+'"]');
+    if(r){
+      r.classList.add(curEvForLine.type === 'exception' ? 'cur-exc' : 'cur');
+      r.scrollIntoView({block:'nearest'});
+    }
+  }
+
+  // Wipe canvas
+  const svgEl = document.getElementById('canvas');
+  while(svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
+
+  graphW = positions._canvasW || 900;
+  graphH = positions._canvasH || 600;
+  if(firstRender){ fitToGraph(); firstRender = false; }
+  else applyView();
+
+  if(!graph.nodes.size){
+    const g = svg('g', {transform:'translate(40,40)'}, svgEl);
+    svg('text', {x:0, y:0, class:'node-sub'}, g).textContent =
+      events.length ? 'No calls in this trace.' : 'No trace loaded.';
+    return;
+  }
+
+  // Pass 1: edges (so they sit beneath nodes)
+  for(const [key, edge] of graph.edges){
+    const from = positions.get(edge.from);
+    const to = positions.get(edge.to);
+    if(!from || !to) continue;
+    const isActive = activeEdgeKeys.has(key);
+    const isExt = edge.kind === 'extcall';
+    const cls = 'edge' + (isExt ? ' extcall' : '') + (isActive ? ' active' : '');
+    drawEdge(svgEl, from, to, edge, isActive, isExt, cls);
+  }
+
+  // Pass 2: nodes
+  for(const [name, node] of graph.nodes){
+    const pos = positions.get(name);
+    if(!pos) continue;
+    drawNode(svgEl, name, node, pos, activeNames.has(name), name === selectedFunc);
+  }
+
+  // Transport indicators
+  document.getElementById('cur').textContent = cur;
+  document.getElementById('scrub').value = cur;
+}
+
+function drawEdge(parent, from, to, edge, isActive, isExt, cls){
+  // Centre-to-centre, clipped to the node rectangles.
+  const x1 = from.x, y1 = from.y + NODE_H/2;          // bottom centre of caller
+  const x2 = to.x,   y2 = to.y  - NODE_H/2;           // top centre of callee
+  // Curve gently. Quadratic Bezier through a midpoint.
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  const d = `M${x1},${y1} Q${mx},${my - 14} ${x2},${y2}`;
+  const path = svg('path', {d, class:cls}, parent);
+
+  // Arrow head at destination
+  const dx = x2 - mx, dy = (y2) - (my - 14);
+  const ang = Math.atan2(dy, dx);
+  const ax = x2 - Math.cos(ang) * 1;
+  const ay = y2 - Math.sin(ang) * 1;
+  const ahCls = 'edge-head' + (isExt ? ' extcall' : '') + (isActive ? ' active' : '');
+  const ah1x = ax - Math.cos(ang - 0.4) * 9;
+  const ah1y = ay - Math.sin(ang - 0.4) * 9;
+  const ah2x = ax - Math.cos(ang + 0.4) * 9;
+  const ah2y = ay - Math.sin(ang + 0.4) * 9;
+  svg('polygon', {points: `${ax},${ay} ${ah1x},${ah1y} ${ah2x},${ah2y}`, class:ahCls}, parent);
+
+  // Edge labels: latest call's args (near caller), return (near callee)
+  // Find the most-recent invocation at or before cur.
+  let latest = null;
+  for(const inv of edge.calls){
+    if(inv.callSeq <= cur) latest = inv;
+    else break;
+  }
+  if(!latest) return;
+
+  const argsStr = formatArgs(latest.args);
+  const retStr  = latest.returnSeq != null && latest.returnSeq <= cur
+                  ? formatRet(latest.returnValue) : '…';
+
+  // Place "args" label near the start (caller side)
+  if(argsStr){
+    const labelX = x1 + (mx - x1) * 0.45;
+    const labelY = y1 + (my - 14 - y1) * 0.45;
+    drawEdgeLabel(parent, labelX, labelY, '→ ' + argsStr, 'edge-label in');
+  }
+  // Place "returns" label near the end (callee side)
+  const rLabelX = mx + (x2 - mx) * 0.55;
+  const rLabelY = (my - 14) + (y2 - (my - 14)) * 0.55;
+  drawEdgeLabel(parent, rLabelX, rLabelY, '← ' + retStr, 'edge-label out');
+}
+
+function drawEdgeLabel(parent, x, y, text, cls){
+  const t = truncate(text, 26);
+  const w = t.length * 6.6 + 12;
+  const g = svg('g', {transform:`translate(${x - w/2},${y - 9})`}, parent);
+  svg('rect', {x:0, y:0, width:w, height:18, rx:5, ry:5, class:'edge-label-bg'}, g);
+  svg('text', {x:w/2, y:13, 'text-anchor':'middle', class:cls}, g).textContent = t;
+}
+
+function drawNode(parent, name, node, pos, isActive, isSelected){
+  const total = node.invocations.length;
+  const isMulti = total > 1;
+  const isExt = node.kind === 'extcall';
+  const isEntry = node.kind === 'entry';
+  const cls = ['node-bg'];
+  if(isExt) cls.push('extcall');
+  if(isEntry) cls.push('entry');
+  if(isMulti) cls.push('multi');
+  if(isActive && !isEntry) cls.push('active');
+  if(isSelected) cls.push('selected');
+
+  const g = svg('g', {transform:`translate(${pos.x - NODE_W/2},${pos.y - NODE_H/2})`,
+                      class:'node', 'data-func': name}, parent);
+  svg('rect', {x:0, y:0, width:NODE_W, height:NODE_H, rx:12, ry:12, class:cls.join(' ')}, g);
+  const labelCls = 'node-label' + (isEntry ? ' entry' : '');
+  svg('text', {x:NODE_W/2, y:isEntry ? 33 : 24, 'text-anchor':'middle', class:labelCls}, g)
+    .textContent = isEntry ? 'script start' : truncate(name, 18);
+  if(!isEntry){
+    const sub = isExt ? `${total} call${total>1?'s':''}` :
+                isMulti ? `called ×${total}` :
+                `called ${total} time`;
+    svg('text', {x:NODE_W/2, y:42, 'text-anchor':'middle', class:'node-sub'}, g).textContent = sub;
+  }
+  if(!isEntry){
+    g.addEventListener('click', () => {
+      selectedFunc = (selectedFunc === name) ? null : name;
+      renderDetails();
+      render();
+    });
+  }
+}
+
+function formatArgs(args){
+  if(!args) return '';
+  const keys = Object.keys(args);
+  if(!keys.length) return '()';
+  return keys.map(k => {
+    const v = args[k];
+    return k + '=' + (v.redacted ? '***' : truncate(v.repr, 14));
+  }).join(', ');
+}
+function formatRet(v){
+  if(!v) return '?';
+  if(v.redacted) return '***';
+  return truncate(v.repr, 18);
+}
+
+// -------------------------- Details panel --------------------------
+
+function renderDetails(){
+  const body = document.getElementById('details-body');
+  const closeBtn = document.getElementById('close-details');
+  if(!selectedFunc){
+    body.innerHTML = '<div class="empty">Click a node to see how that function was called and what it returned.</div>';
+    closeBtn.hidden = true;
+    return;
+  }
+  const node = graph.nodes.get(selectedFunc);
+  if(!node){ body.innerHTML = '<div class="empty">No data.</div>'; return; }
+  closeBtn.hidden = false;
+  const isExt = node.kind === 'extcall';
+  const callCount = node.invocations.length;
+  const activeIdx = node.invocations.findIndex(inv =>
+    inv.callSeq <= cur && (inv.returnSeq == null || inv.returnSeq >= cur));
+  let html = '';
+  html += '<h3>'+esc(selectedFunc)+'</h3>';
+  html += '<div class="summary">' +
+    (isExt
+      ? `External target. Hit ${callCount} time${callCount>1?'s':''}.`
+      : `Called ${callCount} time${callCount>1?'s':''} during this trace.`)
+    + '</div>';
+  for(let idx = 0; idx < node.invocations.length; idx++){
+    const inv = node.invocations[idx];
+    const live = idx === activeIdx;
+    html += '<div class="invocation' + (live ? ' active' : '') + '">';
+    html += '  <div class="head">';
+    html += '    <span class="seq">#' + (idx+1) + ' &middot; seq ' + inv.callSeq + '</span>';
+    html += '    <button class="scrubto" data-seq="' + inv.callSeq + '">scrub here</button>';
+    html += '  </div>';
+    if(isExt){
+      html += `  <div class="kv"><span class="k">${esc(inv.verb)}</span><span class="v">${esc(inv.target)}</span></div>`;
+      html += `  <div class="kv"><span class="k">status</span><span class="v ${inv.status===200?'accent':'amber'}">${esc(inv.status)}</span></div>`;
+      html += `  <div class="kv"><span class="k">took</span><span class="v">${esc(inv.duration_ms)} ms</span></div>`;
+      html += `  <div class="kv"><span class="k">called by</span><span class="v">${esc(inv.caller)}</span></div>`;
+    } else {
+      html += `  <div class="kv"><span class="k">called by</span><span class="v">${esc(inv.caller)}</span></div>`;
+      const argKeys = Object.keys(inv.args || {});
+      if(argKeys.length){
+        for(const k of argKeys){
+          const v = inv.args[k];
+          html += `  <div class="kv"><span class="k">${esc(k)}</span><span class="v ${v.redacted?'redacted':''}">${esc(v.redacted?'<hidden>':v.repr)}</span></div>`;
+        }
+      } else {
+        html += `  <div class="kv"><span class="k">args</span><span class="v">(none)</span></div>`;
+      }
+      if(inv.returnSeq != null){
+        const rv = inv.returnValue;
+        const rcls = rv && rv.redacted ? 'redacted' : 'accent';
+        const rtxt = rv ? (rv.redacted ? '<hidden>' : rv.repr) : '?';
+        html += `  <div class="kv"><span class="k">returns</span><span class="v ${rcls}">${esc(rtxt)}</span></div>`;
+      } else {
+        html += `  <div class="kv"><span class="k">returns</span><span class="v">(still running)</span></div>`;
+      }
+      // Local variable snapshot at return-time
+      const localKeys = Object.keys(inv.locals || {});
+      if(localKeys.length){
+        html += '<div class="varlist"><div class="lbl">locals at this point</div>';
+        for(const k of localKeys){
+          const v = inv.locals[k];
+          html += `<div class="kv"><span class="k">${esc(k)}</span><span class="v ${v.redacted?'redacted':''}">${esc(v.redacted?'<hidden>':v.repr)}</span></div>`;
+        }
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+  }
+  body.innerHTML = html;
+  body.querySelectorAll('.scrubto').forEach(btn => {
+    btn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const s = +btn.dataset.seq;
+      pause(); go(s);
+    });
+  });
+}
+
+document.getElementById('close-details').addEventListener('click', () => {
+  selectedFunc = null; renderDetails(); render();
+});
+
+// -------------------------- Transport --------------------------
+
+function go(i){ cur = Math.max(0, Math.min(events.length-1, i)); render(); renderDetails(); }
+function step(d){ pause(); go(cur+d); }
+function play(){
+  if(timer) return pause();
+  if(cur >= events.length-1) cur = 0;
+  document.getElementById('play').innerHTML='&#10073;&#10073;';
+  const tick = () => {
+    if(cur >= events.length-1){ pause(); return; }
+    go(cur+1);
+    timer = setTimeout(tick, +document.getElementById('speed').value);
+  };
+  timer = setTimeout(tick, +document.getElementById('speed').value);
+}
+function pause(){ if(timer){ clearTimeout(timer); timer=null; } document.getElementById('play').innerHTML='&#9658;'; }
+
+document.getElementById('back').onclick = () => step(-1);
+document.getElementById('fwd').onclick = () => step(1);
+document.getElementById('play').onclick = play;
+document.getElementById('jump-exc').addEventListener('click', () => {
+  if(!exceptionSeqs.length) return;
+  const next = exceptionSeqs.find(s => s > cur);
+  pause();
+  go(next != null ? next : exceptionSeqs[0]);
+});
+document.getElementById('scrub').oninput = e => { pause(); go(+e.target.value); };
+document.getElementById('cur').textContent = '0';
+document.getElementById('load').onclick = () => document.getElementById('file').click();
+document.getElementById('file').onchange = ev => {
+  const f = ev.target.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try { load(JSON.parse(rd.result)); }
+    catch(err){ alert('Could not parse trace: ' + err.message); }
+  };
+  rd.readAsText(f);
+};
+window.addEventListener('keydown', e => {
+  if(e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if(e.key === 'ArrowRight'){ step(1); e.preventDefault(); }
+  else if(e.key === 'ArrowLeft'){ step(-1); e.preventDefault(); }
+  else if(e.key === ' '){ play(); e.preventDefault(); }
+  else if(e.key === 'Home'){ pause(); go(0); }
+  else if(e.key === 'End'){ pause(); go(events.length-1); }
+});
+
+// -------------------------- Zoom + pan --------------------------
+function wrapSize(){
+  const r = document.getElementById('canvas-wrap').getBoundingClientRect();
+  return {w: r.width, h: r.height};
+}
+
+function applyView(){
+  const {w, h} = wrapSize();
+  if(w === 0 || h === 0) return;
+  const vbW = w / zoomState.scale;
+  const vbH = h / zoomState.scale;
+  document.getElementById('canvas').setAttribute(
+    'viewBox', `${zoomState.panX} ${zoomState.panY} ${vbW} ${vbH}`
+  );
+  document.getElementById('zoom-level').textContent = Math.round(zoomState.scale * 100) + '%';
+}
+
+function fitToGraph(){
+  const {w, h} = wrapSize();
+  if(w === 0 || h === 0) return;
+  const pad = 40;
+  const sx = (w - 2*pad) / Math.max(graphW, 1);
+  const sy = (h - 2*pad) / Math.max(graphH, 1);
+  const s = Math.max(0.2, Math.min(2.5, Math.min(sx, sy)));
+  zoomState.scale = s;
+  // Centre graph in the viewport
+  zoomState.panX = -((w / s) - graphW) / 2;
+  zoomState.panY = -((h / s) - graphH) / 2;
+  applyView();
+}
+
+function zoomTo(newScale, anchorX, anchorY){
+  const {w, h} = wrapSize();
+  if(w === 0 || h === 0) return;
+  // Graph-space point currently under the anchor
+  const gx = zoomState.panX + (anchorX / w) * (w / zoomState.scale);
+  const gy = zoomState.panY + (anchorY / h) * (h / zoomState.scale);
+  zoomState.scale = Math.max(0.2, Math.min(4, newScale));
+  // Keep that graph point under the anchor after the scale change
+  zoomState.panX = gx - (anchorX / w) * (w / zoomState.scale);
+  zoomState.panY = gy - (anchorY / h) * (h / zoomState.scale);
+  applyView();
+}
+
+(function setupZoom(){
+  const wrap = document.getElementById('canvas-wrap');
+  const svgEl = document.getElementById('canvas');
+
+  // Mouse-wheel zoom toward the cursor
+  wrap.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    const r = wrap.getBoundingClientRect();
+    const ax = ev.clientX - r.left;
+    const ay = ev.clientY - r.top;
+    const factor = ev.deltaY > 0 ? 0.9 : 1.1;
+    zoomTo(zoomState.scale * factor, ax, ay);
+  }, {passive: false});
+
+  // Drag-to-pan (only when not clicking a node)
+  let panning = null;
+  svgEl.addEventListener('mousedown', ev => {
+    if(ev.target.closest('g.node')) return;
+    ev.preventDefault();
+    panning = {x: ev.clientX, y: ev.clientY,
+               panX: zoomState.panX, panY: zoomState.panY};
+    wrap.classList.add('panning');
+  });
+  document.addEventListener('mousemove', ev => {
+    if(!panning) return;
+    const dx = (ev.clientX - panning.x) / zoomState.scale;
+    const dy = (ev.clientY - panning.y) / zoomState.scale;
+    zoomState.panX = panning.panX - dx;
+    zoomState.panY = panning.panY - dy;
+    applyView();
+  });
+  document.addEventListener('mouseup', () => {
+    if(panning){ panning = null; wrap.classList.remove('panning'); }
+  });
+
+  // Toolbar buttons
+  document.getElementById('zoom-in').onclick = () => {
+    const {w, h} = wrapSize();
+    zoomTo(zoomState.scale * 1.25, w/2, h/2);
+  };
+  document.getElementById('zoom-out').onclick = () => {
+    const {w, h} = wrapSize();
+    zoomTo(zoomState.scale / 1.25, w/2, h/2);
+  };
+  document.getElementById('zoom-fit').onclick = () => fitToGraph();
+
+  // Keyboard shortcuts: +, -, 0
+  window.addEventListener('keydown', ev => {
+    if(ev.target.tagName === 'INPUT' || ev.target.tagName === 'SELECT') return;
+    if(ev.key === '+' || ev.key === '='){
+      const {w, h} = wrapSize();
+      zoomTo(zoomState.scale * 1.25, w/2, h/2);
+      ev.preventDefault();
+    } else if(ev.key === '-' || ev.key === '_'){
+      const {w, h} = wrapSize();
+      zoomTo(zoomState.scale / 1.25, w/2, h/2);
+      ev.preventDefault();
+    } else if(ev.key === '0'){
+      fitToGraph();
+      ev.preventDefault();
+    }
+  });
+
+  // Re-fit when the canvas-wrap container resizes (column drag, window resize)
+  if(typeof ResizeObserver !== 'undefined'){
+    new ResizeObserver(() => applyView()).observe(wrap);
+  }
+})();
+
+// -------------------------- Column resizing --------------------------
+(function setupResizers(){
+  const main = document.querySelector('main');
+  // Restore last widths.
+  try{
+    const saved = JSON.parse(localStorage.getItem('cg_cols') || '{}');
+    if(saved.src) main.style.setProperty('--col-src', saved.src + 'px');
+    if(saved.det) main.style.setProperty('--col-det', saved.det + 'px');
+  } catch(_){}
+
+  function px(name){ return parseInt(getComputedStyle(main).getPropertyValue(name)) || 0; }
+
+  document.querySelectorAll('.dragger').forEach(d => {
+    d.addEventListener('mousedown', ev => {
+      ev.preventDefault();
+      const side = d.dataset.side;
+      const startX = ev.clientX;
+      const startSrc = px('--col-src');
+      const startDet = px('--col-det');
+      d.classList.add('dragging');
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+
+      function onMove(mv){
+        const dx = mv.clientX - startX;
+        if(side === 'src'){
+          const w = Math.max(180, Math.min(720, startSrc + dx));
+          main.style.setProperty('--col-src', w + 'px');
+        } else {
+          const w = Math.max(220, Math.min(620, startDet - dx));
+          main.style.setProperty('--col-det', w + 'px');
+        }
+      }
+      function onUp(){
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        d.classList.remove('dragging');
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+        try{
+          localStorage.setItem('cg_cols', JSON.stringify({
+            src: px('--col-src'), det: px('--col-det')
+          }));
+        } catch(_){}
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+    // Double-click to reset that side to default
+    d.addEventListener('dblclick', () => {
+      const main = document.querySelector('main');
+      if(d.dataset.side === 'src') main.style.removeProperty('--col-src');
+      else main.style.removeProperty('--col-det');
+      try{
+        localStorage.setItem('cg_cols', JSON.stringify({
+          src: px('--col-src'), det: px('--col-det')
+        }));
+      } catch(_){}
+    });
+  });
+})();
+
+// Initial empty render
+render();
+
+// Auto-load via ?trace=<path> or ?id=<library-id>.
+(function autoload(){
+  const url = new URL(window.location.href);
+  const id = url.searchParams.get('id');
+  if(id){
+    fetch('/api/traces/' + encodeURIComponent(id))
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(load)
+      .catch(err => console.error('autoload by id failed', err));
+    return;
+  }
+  const tracePath = url.searchParams.get('trace');
+  if(!tracePath) return;
+  fetch(tracePath).then(r => r.json()).then(load).catch(err => {
+    console.error('autoload failed', err);
+  });
+})();
+
+// Records dropdown (library browser). Talks to /api/traces.
+(function setupRecords(){
+  const btn = document.getElementById('records-btn');
+  const list = document.getElementById('records-list');
+  if(!btn || !list) return;
+  let records = [];
+  let activeId = new URL(location.href).searchParams.get('id') || null;
+
+  function escHtml(s){ return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;'); }
+  function shortPath(p){
+    if(!p) return '';
+    return p.length > 42 ? '…' + p.slice(-41) : p;
+  }
+
+  async function refresh(){
+    try{
+      const r = await fetch('/api/traces');
+      records = r.ok ? await r.json() : [];
+    } catch(e){ records = []; }
+    render();
+  }
+  function render(){
+    if(!records.length){
+      list.innerHTML = '<div class="records-empty">No saved records yet.<br>Run <code>tracesnap record &lt;file.py&gt;</code> to add one.</div>';
+      return;
+    }
+    list.innerHTML = records.map(r => {
+      const isActive = r.id === activeId;
+      return '<div class="record-row'+(isActive?' active':'')+'" data-id="'+escHtml(r.id)+'">' +
+        '<div class="info">' +
+          '<div class="record-name" data-id="'+escHtml(r.id)+'" contenteditable="true" spellcheck="false">'+escHtml(r.name)+'</div>' +
+          '<div class="record-meta">'+escHtml(r.created)+' · '+r.event_count+' events · '+escHtml(r.kind)+(r.source?' · '+escHtml(shortPath(r.source)):'')+'</div>' +
+        '</div>' +
+        '<button class="record-del" data-id="'+escHtml(r.id)+'" title="Delete">&times;</button>' +
+      '</div>';
+    }).join('') +
+    '<div class="records-hint">click a row to load · click the name to rename</div>';
+  }
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    list.classList.toggle('open');
+    if(list.classList.contains('open')) refresh();
+  });
+  document.addEventListener('click', e => {
+    if(!list.contains(e.target) && e.target !== btn) list.classList.remove('open');
+  });
+
+  list.addEventListener('click', async e => {
+    const del = e.target.closest('.record-del');
+    if(del){
+      e.stopPropagation();
+      if(!confirm('Delete this record? This cannot be undone.')) return;
+      await fetch('/api/traces/' + encodeURIComponent(del.dataset.id), {method:'DELETE'});
+      refresh();
+      return;
+    }
+    if(e.target.closest('.record-name')) return;
+    const row = e.target.closest('.record-row');
+    if(!row) return;
+    const id = row.dataset.id;
+    activeId = id;
+    try{
+      const r = await fetch('/api/traces/' + encodeURIComponent(id));
+      if(r.ok){
+        const trace = await r.json();
+        load(trace);
+        try{ history.replaceState(null, '', '?id=' + encodeURIComponent(id)); }catch(_){}
+      }
+    } catch(_){}
+    list.classList.remove('open');
+    render();
+  });
+
+  list.addEventListener('blur', async e => {
+    const nm = e.target.closest && e.target.closest('.record-name');
+    if(!nm) return;
+    const id = nm.dataset.id;
+    const newName = (nm.textContent || '').trim();
+    if(!newName) return;
+    const cur = records.find(r => r.id === id);
+    if(cur && cur.name === newName) return;
+    try{
+      await fetch('/api/traces/' + encodeURIComponent(id), {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name: newName})
+      });
+      refresh();
+    } catch(_){}
+  }, true);
+  list.addEventListener('keydown', e => {
+    if(e.target.classList && e.target.classList.contains('record-name') && e.key === 'Enter'){
+      e.preventDefault(); e.target.blur();
+    }
+  });
+})();
+</script>
+</body>
+</html>

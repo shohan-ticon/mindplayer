@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trace Player</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FAF7F0; --card:#FFFDF8; --inset:#F2ECE0; --code-bg:#FFFDF8;
+  --ink:#211E18; --ink-2:#6B655A; --faint:#E7E0D2;
+  --accent:#0F6E56; --accent-soft:#0F6E5618; --accent-line:#0F6E5640;
+  --amber:#9C5A12; --amber-bg:#F6E6CE; --amber-line:#BA751755;
+  --shadow:0 1px 2px rgba(40,33,20,.05),0 8px 28px rgba(40,33,20,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#1A1815; --card:#221F1B; --inset:#2A2620; --code-bg:#1E1B17;
+    --ink:#ECE6DA; --ink-2:#A39C8C; --faint:#332E26;
+    --accent:#5BC6A1; --accent-soft:#5BC6A11f; --accent-line:#5BC6A150;
+    --amber:#E6AE5C; --amber-bg:#3A2E1C; --amber-line:#E6AE5c44;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.25);
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:"Hanken Grotesk",system-ui,sans-serif; font-size:15px; line-height:1.55;
+  display:flex; flex-direction:column; height:100vh; overflow:hidden;
+}
+header{
+  display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;
+  padding:20px 28px 14px; border-bottom:1px solid var(--faint);
+}
+header h1{
+  font-family:"Fraunces",serif; font-weight:600; font-size:24px; margin:0;
+  letter-spacing:-.01em;
+}
+header .sub{color:var(--ink-2); font-size:13.5px; margin-right:auto}
+.loadbtn{
+  font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink);
+  background:var(--card); border:1px solid var(--faint); border-radius:9px;
+  padding:7px 13px; cursor:pointer; text-decoration:none; display:inline-block;
+  transition:border-color .15s,transform .05s;
+}
+.loadbtn:hover{border-color:var(--accent-line)}
+.loadbtn:active{transform:translateY(1px)}
+.kbd{color:var(--ink-2); font-size:12px; display:flex; gap:10px; align-items:center}
+.kbd b{font:500 11px "JetBrains Mono",monospace; background:var(--inset);
+  border:1px solid var(--faint); border-radius:5px; padding:1px 6px; color:var(--ink)}
+
+/* Records dropdown */
+.records-menu{ position:relative }
+.records-list{
+  position:absolute; top:calc(100% + 6px); right:0;
+  background:var(--card); border:1px solid var(--faint); border-radius:9px;
+  box-shadow:var(--shadow); min-width:340px; max-height:60vh; overflow-y:auto;
+  z-index:1000; display:none;
+}
+.records-list.open{ display:block }
+.records-empty{ padding:18px; color:var(--ink-2); font-size:13px; text-align:center; line-height:1.5 }
+.records-empty code{ font-family:"JetBrains Mono",monospace; font-size:12px;
+  background:var(--inset); padding:2px 6px; border-radius:4px }
+.record-row{ display:flex; align-items:center; gap:10px; padding:9px 12px;
+  cursor:pointer; border-top:1px solid var(--faint); transition:background .15s }
+.record-row:first-child{ border-top:none }
+.record-row:hover{ background:var(--inset) }
+.record-row.active{ background:var(--accent-soft) }
+.record-row .info{ flex:1; min-width:0 }
+.record-name{ font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:1px 2px;
+  border-radius:3px; outline:none }
+.record-name[contenteditable="true"]:focus{ background:var(--paper);
+  outline:1px solid var(--accent); outline-offset:0 }
+.record-meta{ font:400 11px "JetBrains Mono",monospace; color:var(--ink-2);
+  margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.record-del{ background:none; border:none; color:var(--ink-2); cursor:pointer;
+  font-size:18px; line-height:1; padding:2px 8px; border-radius:5px }
+.record-del:hover{ color:#c92a2a; background:var(--inset) }
+.records-hint{ padding:8px 12px; border-top:1px solid var(--faint);
+  font:400 11px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  background:var(--inset) }
+
+main{
+  flex:1; min-height:0; display:grid; grid-template-columns:1.35fr 1fr; gap:20px;
+  padding:20px 28px; max-width:1240px; width:100%; margin:0 auto;
+}
+@media (max-width:860px){
+  main{grid-template-columns:1fr; overflow-y:auto}
+  body{overflow:auto; height:auto; min-height:100vh}
+}
+.panel{ background:var(--card); border:1px solid var(--faint);
+  border-radius:14px; box-shadow:var(--shadow); overflow:hidden }
+.panel .cap{ font:600 11.5px "Hanken Grotesk",sans-serif; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--accent); padding:13px 16px 8px;
+  border-bottom:1px solid var(--faint); background:var(--inset); flex:none }
+/* Source = full-height left column; only #code scrolls inside */
+.panel.source{ display:flex; flex-direction:column; min-height:0; overflow:hidden }
+/* Right column: scrolls as a whole. Each panel takes its natural content
+   height; when the total exceeds the viewport, the column scrolls so the
+   user can reach Variables even when Call stack is fully expanded. */
+.rightcol{ display:flex; flex-direction:column; gap:14px; min-height:0;
+           overflow-y:auto; padding-bottom:6px }
+.rightcol .panel{ flex:0 0 auto; display:flex; flex-direction:column;
+                  overflow:hidden }                         /* keeps border-radius clip */
+.rightcol .panel > .cap{ flex:none; cursor:pointer; user-select:none;
+                         display:flex; align-items:center; gap:8px;
+                         position:sticky; top:0; z-index:2;
+                         transition:background .15s }
+.rightcol .panel > .cap:hover{ background:var(--card) }
+.rightcol .panel > .cap::after{ content:'▾'; margin-left:auto;
+                                font:600 11px "JetBrains Mono",monospace;
+                                color:var(--ink-2); opacity:.65;
+                                transition:transform .15s }
+.rightcol .panel.collapsed > .cap::after{ transform:rotate(-90deg) }
+.rightcol .panel.collapsed > *:not(.cap){ display:none }
+
+/* code */
+#code{ flex:1; font-family:"JetBrains Mono",monospace; font-size:13.5px; line-height:1.95;
+  padding:10px 6px 14px; background:var(--code-bg); margin-top:8px; overflow:auto }
+.row{ display:flex; align-items:center; white-space:pre; position:relative;
+  padding:0 14px 0 0; transition:background .25s ease }
+.row .ln{ width:38px; text-align:right; padding-right:14px; color:var(--ink-2);
+  opacity:.55; user-select:none; flex:none }
+.row .src{ flex:1 }
+.row.cur{ background:var(--accent-soft) }
+.row.cur .ln{ opacity:1; color:var(--accent); font-weight:700 }
+.row .bar{ position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent;
+  transition:background .25s }
+.row.cur .bar{ background:var(--accent) }
+.row.cur-exc{ background:#c92a2a22 }
+.row.cur-exc .ln{ opacity:1; color:#c92a2a; font-weight:700 }
+.row.cur-exc .bar{ background:#c92a2a }
+
+/* now */
+#now{ padding:14px 16px 16px }
+.chip{ display:inline-block; font:700 10.5px "JetBrains Mono",monospace;
+  letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:6px;
+  background:var(--accent-soft); color:var(--accent); margin-bottom:9px }
+.chip.assign{ background:var(--amber-bg); color:var(--amber) }
+.chip.extcall{ background:#7B4B9F22; color:#7B4B9F }
+@media (prefers-color-scheme:dark){ .chip.extcall{ background:#C39BE622; color:#C39BE6 } }
+.chip.exception{ background:#c92a2a22; color:#c92a2a }
+.exc-msg{ font:500 14px "Hanken Grotesk",sans-serif; color:#c92a2a }
+.exc-jump{ color:#c92a2a !important; border-color:#c92a2a55 !important }
+.exc-jump:hover{ border-color:#c92a2a !important }
+#nowtext{ font-family:"Fraunces",serif; font-size:19px; font-weight:400;
+  line-height:1.4; letter-spacing:-.005em }
+#nowtext code{ font-family:"JetBrains Mono",monospace; font-size:15px; font-weight:500 }
+#nowtext .v{ color:var(--accent); font-weight:500 }
+
+/* frames + vars */
+#frames{ padding:6px 12px 14px }
+.frame{ border:1px solid var(--faint); border-radius:11px; margin-top:10px;
+  background:var(--paper); overflow:hidden }
+.frame.top{ border-color:var(--accent-line) }
+.frame.returned{ opacity:.72 }
+.frame.raised{ border-color:#c92a2a55 }
+.frame .fh{ font:500 12.5px "JetBrains Mono",monospace; padding:9px 12px;
+  background:var(--inset); color:var(--ink); border-bottom:1px solid var(--faint);
+  display:flex; align-items:center; gap:8px }
+.frame.top .fh{ background:var(--accent-soft) }
+.frame.raised .fh{ background:#c92a2a18 }
+.frame .fh .tag{ font:500 10px "Hanken Grotesk",sans-serif; text-transform:uppercase;
+  letter-spacing:.06em; color:var(--accent); margin-left:auto }
+.frame .fh .tag.returned{ color:var(--ink-2) }
+.frame .fh .tag.raised{ color:#c92a2a }
+.var{ display:flex; align-items:center; gap:10px; padding:7px 12px;
+  border-top:1px solid var(--faint); transition:background .3s }
+.var:first-child{ border-top:none }
+.var .nm{ font:500 13px "JetBrains Mono",monospace; min-width:74px }
+.var .val{ font:400 13px "JetBrains Mono",monospace; color:var(--ink) }
+.var .from{ color:var(--ink-2); font:400 12px "JetBrains Mono",monospace }
+.var .arrow{ color:var(--ink-2); margin:0 2px }
+.var .cnt{ margin-left:auto; font:500 10.5px "JetBrains Mono",monospace;
+  color:var(--ink-2); background:var(--inset); border-radius:20px; padding:2px 8px;
+  border:1px solid var(--faint) }
+.var.changed{ background:var(--amber-bg) }
+.var.changed .nm{ color:var(--amber) }
+.var.changed .cnt{ color:var(--amber); border-color:var(--amber-line) }
+.redacted{ color:var(--ink-2); font-style:italic }
+.empty{ color:var(--ink-2); font-size:13px; padding:10px 12px }
+
+/* variables history panel */
+#vars{ padding:6px 12px 14px }
+#vars .frame{ background:var(--paper) }
+.varrow{ display:flex; align-items:flex-start; gap:10px; padding:8px 12px;
+  border-top:1px solid var(--faint) }
+.varrow:first-child{ border-top:none }
+.varrow .nm{ font:500 13px "JetBrains Mono",monospace; min-width:74px; padding-top:3px;
+  color:var(--ink) }
+.varrow .pills{ display:flex; flex-wrap:wrap; gap:6px; flex:1 }
+.pill{ font:500 12px "JetBrains Mono",monospace; color:var(--ink);
+  background:var(--inset); border:1px solid var(--faint); border-radius:999px;
+  padding:2px 10px; cursor:pointer; transition:border-color .15s,background .2s;
+  display:inline-flex; align-items:center; gap:6px }
+.pill:hover{ border-color:var(--accent-line) }
+.pill.cur{ background:var(--accent-soft); border-color:var(--accent-line); color:var(--accent) }
+.pill.arg{ background:var(--amber-bg); border-color:var(--amber-line); color:var(--amber) }
+.pill.arg.cur{ box-shadow:inset 0 0 0 1px var(--amber-line) }
+.pill .tag{ font:500 9.5px "Hanken Grotesk",sans-serif; text-transform:uppercase;
+  letter-spacing:.06em; color:var(--ink-2); opacity:.85 }
+.pill.arg .tag{ color:var(--amber); opacity:.9 }
+.pill.redacted-pill{ font-style:italic; color:var(--ink-2) }
+
+/* transport */
+footer{ position:sticky; bottom:0; background:var(--card);
+  border-top:1px solid var(--faint); padding:13px 28px;
+  display:flex; align-items:center; gap:16px; box-shadow:0 -6px 22px rgba(40,33,20,.05) }
+.tbtn{ width:38px; height:38px; border-radius:10px; border:1px solid var(--faint);
+  background:var(--paper); color:var(--ink); cursor:pointer; font-size:15px;
+  display:flex; align-items:center; justify-content:center; transition:border-color .15s,transform .05s }
+.tbtn:hover{ border-color:var(--accent-line) }
+.tbtn:active{ transform:translateY(1px) }
+.tbtn.play{ background:var(--accent); color:#fff; border-color:var(--accent); width:46px }
+@media (prefers-color-scheme:dark){ .tbtn.play{ color:#10221C } }
+#scrub{ flex:1; accent-color:var(--accent); height:4px; cursor:pointer }
+.count{ font:500 13px "JetBrains Mono",monospace; color:var(--ink-2);
+  min-width:96px; text-align:right }
+.count b{ color:var(--ink) }
+.speed{ font:500 12px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  background:var(--paper); border:1px solid var(--faint); border-radius:8px;
+  padding:6px 8px; cursor:pointer }
+</style>
+</head>
+<body>
+<header>
+  <h1>Trace Player</h1>
+  <span class="sub">record once · replay anywhere</span>
+  <a class="loadbtn" href="simulator.html">&uarr; Simulator view</a>
+  <a class="loadbtn" href="call_graph.html">&uarr; Call graph</a>
+  <a class="loadbtn" href="event_graph.html">&uarr; Event graph</a>
+  <a class="loadbtn" href="record.html" style="border-color:var(--accent-line); color:var(--accent)">+ New record</a>
+  <button class="loadbtn exc-jump" id="jump-exc" hidden title="Jump to the next exception">&#9888; 0 exceptions</button>
+  <div class="records-menu">
+    <button class="loadbtn" id="records-btn">Records &#x25BE;</button>
+    <div class="records-list" id="records-list"></div>
+  </div>
+  <button class="loadbtn" id="load">Load trace.json</button>
+  <input type="file" id="file" accept=".json" hidden>
+  <span class="kbd"><b>&larr;</b><b>&rarr;</b> step <b>space</b> play</span>
+</header>
+
+<main>
+  <section class="panel source">
+    <div class="cap">Source</div>
+    <div id="code"></div>
+  </section>
+  <div class="rightcol">
+    <section class="panel" data-section="now">
+      <div class="cap" title="Click to collapse / expand">Now</div>
+      <div id="now"></div>
+    </section>
+    <section class="panel" data-section="frames">
+      <div class="cap" title="Click to collapse / expand">Call stack</div>
+      <div id="frames"></div>
+    </section>
+    <section class="panel grow" data-section="vars">
+      <div class="cap" title="Click to collapse / expand">Variables &mdash; full history</div>
+      <div id="vars"></div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <button class="tbtn" id="back" title="Step back (←)">&#9664;</button>
+  <button class="tbtn play" id="play" title="Play / pause (space)">&#9658;</button>
+  <button class="tbtn" id="fwd" title="Step forward (→)">&#9654;</button>
+  <input type="range" id="scrub" min="0" value="0">
+  <select class="speed" id="speed" title="Playback speed">
+    <option value="700">0.5&times;</option>
+    <option value="380" selected>1&times;</option>
+    <option value="180">2&times;</option>
+    <option value="70">4&times;</option>
+  </select>
+  <span class="count">step <b id="cur">0</b> / <span id="tot">0</span></span>
+</footer>
+
+<script>const TRACE = {
+  "version": "0.1",
+  "trace_id": "demo-checkout",
+  "structure_ref": "structure.json",
+  "session": {
+    "kind": "script",
+    "granularity": "line",
+    "entry": "sample_program.py:<module>",
+    "source": "def apply_discount(price, pct):\n    saved = price * pct / 100\n    final = price - saved\n    return final\n\n\ndef checkout(items, coupon):\n    subtotal = 0\n    for item in items:\n        subtotal += item\n    if coupon:\n        total = apply_discount(subtotal, 10)\n    else:\n        total = subtotal\n    return total\n\n\nreceipt = checkout([100, 50, 25], True)\n",
+    "redaction": {
+      "key_rules": [
+        "api_key",
+        "authorization",
+        "password",
+        "secret",
+        "token"
+      ]
+    }
+  },
+  "events": [
+    {
+      "seq": 0,
+      "ts": 353829,
+      "depth": 1,
+      "type": "call",
+      "func": "checkout",
+      "line": 7,
+      "args": {
+        "items": {
+          "repr": "[100, 50, 25]",
+          "type": "list",
+          "id": 140562035487040,
+          "truncated": false,
+          "redacted": false
+        },
+        "coupon": {
+          "repr": "True",
+          "type": "bool",
+          "id": 10654560,
+          "truncated": false,
+          "redacted": false
+        }
+      }
+    },
+    {
+      "seq": 1,
+      "ts": 382453,
+      "depth": 1,
+      "type": "line",
+      "line": 8,
+      "func": "checkout"
+    },
+    {
+      "seq": 2,
+      "ts": 392059,
+      "depth": 1,
+      "type": "assign",
+      "var": "subtotal",
+      "scope": "local",
+      "line": 8,
+      "value": {
+        "repr": "0",
+        "type": "int",
+        "id": 11755656,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0
+    },
+    {
+      "seq": 3,
+      "ts": 395501,
+      "depth": 1,
+      "type": "line",
+      "line": 9,
+      "func": "checkout"
+    },
+    {
+      "seq": 4,
+      "ts": 401792,
+      "depth": 1,
+      "type": "assign",
+      "var": "item",
+      "scope": "local",
+      "line": 9,
+      "value": {
+        "repr": "100",
+        "type": "int",
+        "id": 11758856,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0
+    },
+    {
+      "seq": 5,
+      "ts": 405044,
+      "depth": 1,
+      "type": "loop",
+      "node_id": "checkout.for9",
+      "line": 10,
+      "iteration": 0
+    },
+    {
+      "seq": 6,
+      "ts": 406198,
+      "depth": 1,
+      "type": "line",
+      "line": 10,
+      "func": "checkout"
+    },
+    {
+      "seq": 7,
+      "ts": 412826,
+      "depth": 1,
+      "type": "assign",
+      "var": "subtotal",
+      "scope": "local",
+      "line": 10,
+      "value": {
+        "repr": "100",
+        "type": "int",
+        "id": 11758856,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": {
+        "repr": "0",
+        "type": "int",
+        "id": 11755656,
+        "truncated": false,
+        "redacted": false
+      },
+      "change_index": 1
+    },
+    {
+      "seq": 8,
+      "ts": 414911,
+      "depth": 1,
+      "type": "line",
+      "line": 9,
+      "func": "checkout"
+    },
+    {
+      "seq": 9,
+      "ts": 420273,
+      "depth": 1,
+      "type": "assign",
+      "var": "item",
+      "scope": "local",
+      "line": 9,
+      "value": {
+        "repr": "50",
+        "type": "int",
+        "id": 11757256,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": {
+        "repr": "100",
+        "type": "int",
+        "id": 11758856,
+        "truncated": false,
+        "redacted": false
+      },
+      "change_index": 1
+    },
+    {
+      "seq": 10,
+      "ts": 422304,
+      "depth": 1,
+      "type": "loop",
+      "node_id": "checkout.for9",
+      "line": 10,
+      "iteration": 1
+    },
+    {
+      "seq": 11,
+      "ts": 423333,
+      "depth": 1,
+      "type": "line",
+      "line": 10,
+      "func": "checkout"
+    },
+    {
+      "seq": 12,
+      "ts": 427498,
+      "depth": 1,
+      "type": "assign",
+      "var": "subtotal",
+      "scope": "local",
+      "line": 10,
+      "value": {
+        "repr": "150",
+        "type": "int",
+        "id": 11760456,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": {
+        "repr": "100",
+        "type": "int",
+        "id": 11758856,
+        "truncated": false,
+        "redacted": false
+      },
+      "change_index": 2
+    },
+    {
+      "seq": 13,
+      "ts": 428918,
+      "depth": 1,
+      "type": "line",
+      "line": 9,
+      "func": "checkout"
+    },
+    {
+      "seq": 14,
+      "ts": 432809,
+      "depth": 1,
+      "type": "assign",
+      "var": "item",
+      "scope": "local",
+      "line": 9,
+      "value": {
+        "repr": "25",
+        "type": "int",
+        "id": 11756456,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": {
+        "repr": "50",
+        "type": "int",
+        "id": 11757256,
+        "truncated": false,
+        "redacted": false
+      },
+      "change_index": 2
+    },
+    {
+      "seq": 15,
+      "ts": 434381,
+      "depth": 1,
+      "type": "loop",
+      "node_id": "checkout.for9",
+      "line": 10,
+      "iteration": 2
+    },
+    {
+      "seq": 16,
+      "ts": 435206,
+      "depth": 1,
+      "type": "line",
+      "line": 10,
+      "func": "checkout"
+    },
+    {
+      "seq": 17,
+      "ts": 438928,
+      "depth": 1,
+      "type": "assign",
+      "var": "subtotal",
+      "scope": "local",
+      "line": 10,
+      "value": {
+        "repr": "175",
+        "type": "int",
+        "id": 11761256,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": {
+        "repr": "150",
+        "type": "int",
+        "id": 11760456,
+        "truncated": false,
+        "redacted": false
+      },
+      "change_index": 3
+    },
+    {
+      "seq": 18,
+      "ts": 440428,
+      "depth": 1,
+      "type": "line",
+      "line": 9,
+      "func": "checkout"
+    },
+    {
+      "seq": 19,
+      "ts": 443868,
+      "depth": 1,
+      "type": "line",
+      "line": 11,
+      "func": "checkout"
+    },
+    {
+      "seq": 20,
+      "ts": 446996,
+      "depth": 1,
+      "type": "branch",
+      "node_id": "checkout.if11",
+      "line": 12,
+      "taken": "if"
+    },
+    {
+      "seq": 21,
+      "ts": 448018,
+      "depth": 1,
+      "type": "line",
+      "line": 12,
+      "func": "checkout"
+    },
+    {
+      "seq": 22,
+      "ts": 463303,
+      "depth": 2,
+      "type": "call",
+      "func": "apply_discount",
+      "line": 1,
+      "args": {
+        "price": {
+          "repr": "175",
+          "type": "int",
+          "id": 11761256,
+          "truncated": false,
+          "redacted": false
+        },
+        "pct": {
+          "repr": "10",
+          "type": "int",
+          "id": 11755976,
+          "truncated": false,
+          "redacted": false
+        }
+      }
+    },
+    {
+      "seq": 23,
+      "ts": 468084,
+      "depth": 2,
+      "type": "line",
+      "line": 2,
+      "func": "apply_discount"
+    },
+    {
+      "seq": 24,
+      "ts": 516313,
+      "depth": 2,
+      "type": "assign",
+      "var": "saved",
+      "scope": "local",
+      "line": 2,
+      "value": {
+        "repr": "17.5",
+        "type": "float",
+        "id": 140562036572272,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0
+    },
+    {
+      "seq": 25,
+      "ts": 519619,
+      "depth": 2,
+      "type": "line",
+      "line": 3,
+      "func": "apply_discount"
+    },
+    {
+      "seq": 26,
+      "ts": 528323,
+      "depth": 2,
+      "type": "assign",
+      "var": "final",
+      "scope": "local",
+      "line": 3,
+      "value": {
+        "repr": "157.5",
+        "type": "float",
+        "id": 140562036584944,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0
+    },
+    {
+      "seq": 27,
+      "ts": 530226,
+      "depth": 2,
+      "type": "line",
+      "line": 4,
+      "func": "apply_discount"
+    },
+    {
+      "seq": 28,
+      "ts": 535959,
+      "depth": 2,
+      "type": "return",
+      "value": {
+        "repr": "157.5",
+        "type": "float",
+        "id": 140562036584944,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 4,
+      "func": "apply_discount"
+    },
+    {
+      "seq": 29,
+      "ts": 542344,
+      "depth": 1,
+      "type": "assign",
+      "var": "total",
+      "scope": "local",
+      "line": 12,
+      "value": {
+        "repr": "157.5",
+        "type": "float",
+        "id": 140562036584944,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0
+    },
+    {
+      "seq": 30,
+      "ts": 544026,
+      "depth": 1,
+      "type": "line",
+      "line": 15,
+      "func": "checkout"
+    },
+    {
+      "seq": 31,
+      "ts": 549443,
+      "depth": 1,
+      "type": "return",
+      "value": {
+        "repr": "157.5",
+        "type": "float",
+        "id": 140562036584944,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 15,
+      "func": "checkout"
+    }
+  ]
+};</script>
+<script>
+let trace = TRACE, events = [], lines = [], cur = 0, timer = null;
+let calls = [];   // ordered list of call frames with full per-variable value history
+let exceptionSeqs = [];   // seqs of all `exception` events for the Jump button
+
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function valStr(v){ return v && v.redacted ? '<span class="redacted">'+esc(v.repr)+'</span>' : esc(v.repr); }
+
+// Walk all events once and build per-frame variable histories. Each frame
+// keeps a `vars` map of var-name -> ordered list of {seq, line, value, prev, kind}.
+// Args from the `call` event become the first pill for each parameter.
+function buildCalls(evs){
+  const out = [];
+  const stack = [];   // indices into `out` for currently-open frames
+  for(const e of evs){
+    if(e.type==='call'){
+      const fr = { seq:e.seq, func:e.func, line:e.line, depth:e.depth, vars:{}, open:true };
+      for(const k in (e.args||{})){
+        (fr.vars[k] = fr.vars[k] || []).push({
+          seq:e.seq, line:e.line, value:e.args[k], prev:null, kind:'arg', ci:0
+        });
+      }
+      out.push(fr);
+      stack.push(out.length-1);
+    } else if(e.type==='assign'){
+      const i = stack[stack.length-1]; if(i==null) continue;
+      const fr = out[i];
+      (fr.vars[e.var] = fr.vars[e.var] || []).push({
+        seq:e.seq, line:e.line, value:e.value, prev:e.prev, kind:'assign', ci:e.change_index
+      });
+    } else if(e.type==='return'){
+      const i = stack.pop(); if(i!=null) out[i].open = false;
+    }
+  }
+  return out;
+}
+
+function load(t){
+  if(!t || !Array.isArray(t.events)){
+    alert('That JSON does not look like a trace. Expected an object with an "events" array — try trace.json or trace_request.json (not structure.json).');
+    return;
+  }
+  trace = t;
+  events = t.events;
+  lines = ((t.session && t.session.source) || "").replace(/\n$/,"").split("\n");
+  calls = buildCalls(events);
+  exceptionSeqs = events.filter(e => e.type === 'exception').map(e => e.seq);
+  cur = 0;
+  document.getElementById('tot').textContent = Math.max(events.length-1,0);
+  document.getElementById('scrub').max = Math.max(events.length-1,0);
+  renderCode();
+  renderVars();
+  renderExcBtn();
+  render();
+}
+
+function renderExcBtn(){
+  const btn = document.getElementById('jump-exc');
+  if(!btn) return;
+  if(!exceptionSeqs.length){ btn.hidden = true; return; }
+  btn.hidden = false;
+  btn.innerHTML = '⚠ ' + exceptionSeqs.length + ' exception' + (exceptionSeqs.length>1?'s':'');
+}
+
+function renderCode(){
+  const el = document.getElementById('code');
+  el.innerHTML = lines.map((ln,i)=>(
+    '<div class="row" data-line="'+(i+1)+'"><span class="bar"></span>'+
+    '<span class="ln">'+(i+1)+'</span><span class="src">'+(esc(ln)||" ")+'</span></div>'
+  )).join('');
+}
+
+// Render the Variables panel once per trace load. The active-pill highlight
+// is updated incrementally inside render() and doesn't require a re-render.
+function renderVars(){
+  const el = document.getElementById('vars');
+  if(!calls.length){ el.innerHTML = '<div class="empty">No calls recorded.</div>'; return; }
+  const counts = {}, indices = {};
+  for(const f of calls) counts[f.func] = (counts[f.func]||0) + 1;
+  el.innerHTML = calls.map((fr, fi)=>{
+    indices[fr.func] = (indices[fr.func]||0) + 1;
+    const suffix = counts[fr.func] > 1 ? ' <span class="tag">#'+indices[fr.func]+'</span>' : '';
+    const varNames = Object.keys(fr.vars);
+    const body = !varNames.length
+      ? '<div class="empty">no locals</div>'
+      : varNames.map(nm => {
+          const pills = fr.vars[nm].map(p => {
+            const cls = ['pill'];
+            if(p.kind==='arg') cls.push('arg');
+            const tag = p.kind==='arg' ? '<span class="tag">arg</span>' : '';
+            const title = 'line '+p.line + (p.kind==='arg' ? ' · passed in' : ' · assignment');
+            const txt = p.value && p.value.redacted
+              ? '<span class="redacted">'+esc(p.value.repr)+'</span>'
+              : esc(p.value.repr);
+            return '<button type="button" class="'+cls.join(' ')+'" data-seq="'+p.seq+
+                   '" title="'+esc(title)+'">'+txt+tag+'</button>';
+          }).join('');
+          return '<div class="varrow" data-var="'+esc(nm)+'" data-frame="'+fi+
+                 '"><span class="nm">'+esc(nm)+'</span><div class="pills">'+pills+'</div></div>';
+        }).join('');
+    return '<div class="frame" data-fi="'+fi+'"><div class="fh"><code>'+esc(fr.func)+'</code>'+suffix+'</div>'+body+'</div>';
+  }).join('');
+}
+
+// Mark the most recently-applied pill (per variable, per frame) as .cur,
+// relative to the current step. Cheap linear pass; fine for trace sizes here.
+function highlightActivePills(){
+  document.querySelectorAll('#vars .pill.cur').forEach(p => p.classList.remove('cur'));
+  for(let fi=0; fi<calls.length; fi++){
+    const fr = calls[fi];
+    for(const nm in fr.vars){
+      const arr = fr.vars[nm];
+      let activeSeq = null;
+      for(const p of arr){ if(p.seq <= cur) activeSeq = p.seq; else break; }
+      if(activeSeq == null) continue;
+      const sel = '#vars .frame[data-fi="'+fi+'"] .varrow[data-var="'+CSS.escape(nm)+
+                  '"] .pill[data-seq="'+activeSeq+'"]';
+      const btn = document.querySelector(sel);
+      if(btn) btn.classList.add('cur');
+    }
+  }
+}
+
+// Fold events[0..cur] into a render state. We keep TWO views of the call
+// information:
+//   - `liveStack`: frames that are currently on the Python stack at `cur`.
+//   - `frames`: ALL frames ever called up to `cur`, with their final locals
+//     at the moment they returned (or current values if still live). This is
+//     what the Call-stack panel renders, so the user can still see what
+//     `add` / `subtract` were called with after they've returned and only
+//     `divide` is live.
+function compute(){
+  const liveStack = [];
+  const frames = [];     // in call order
+  let lastReturn = null, changedHere = null;
+  const last = Math.min(cur, events.length - 1);
+  for(let i=0;i<=last;i++){
+    const e = events[i];
+    if(!e) continue;
+    if(e.type==='call'){
+      const vars = {};
+      for(const k in (e.args||{})) vars[k] = {repr:e.args[k].repr, redacted:e.args[k].redacted, type:e.args[k].type, ci:0};
+      const frame = {seq:e.seq, func:e.func, params:Object.keys(e.args||{}),
+                     vars, active:true, raised:false};
+      liveStack.push(frame);
+      frames.push(frame);
+    } else if(e.type==='assign'){
+      const f = liveStack[liveStack.length-1]; if(!f) continue;
+      f.vars[e.var] = {repr:e.value.repr, redacted:e.value.redacted, type:e.value.type, ci:e.change_index};
+      if(i===cur) changedHere = {frameSeq:f.seq, name:e.var, prev:e.prev};
+    } else if(e.type==='exception'){
+      const f = liveStack[liveStack.length-1];
+      if(f) f.raised = true;
+    } else if(e.type==='return'){
+      lastReturn = {func:e.func, value:e.value};
+      const f = liveStack.pop();
+      if(f) f.active = false;
+    }
+  }
+  const e = events[cur] || {};
+  // Backwards-compat alias: many callers still call this `stack`.
+  return {stack: liveStack, frames, lastReturn, changedHere, e};
+}
+
+function nowText(e, st){
+  if(!e) return '';
+  if(e.type==='call'){
+    const a = Object.entries(e.args||{}).map(([k,v])=>k+'='+'<span class="v">'+valStr(v)+'</span>').join(', ');
+    return 'Entered <code>'+esc(e.func)+'</code>('+a+')';
+  }
+  if(e.type==='return') return 'Returned <span class="v">'+valStr(e.value)+'</span> from <code>'+esc(e.func)+'</code>';
+  if(e.type==='assign'){
+    if(e.prev==null) return '<code>'+esc(e.var)+'</code> set to <span class="v">'+valStr(e.value)+'</span>';
+    return '<code>'+esc(e.var)+'</code> changed from '+valStr(e.prev)+' to <span class="v">'+valStr(e.value)+'</span>';
+  }
+  if(e.type==='branch') return 'Took the <span class="v">'+esc(e.taken)+'</span> branch';
+  if(e.type==='loop') return 'Loop pass <span class="v">'+(e.iteration+1)+'</span>';
+  if(e.type==='line'){ const t=(lines[e.line-1]||'').trim(); return 'Running <code>'+esc(t)+'</code>'; }
+  if(e.type==='extcall'){
+    const status = e.status!=null ? ' &rarr; <span class="v">'+esc(String(e.status))+'</span>' : '';
+    const dur = e.duration_ms!=null ? ' in <span class="v">'+esc(String(e.duration_ms))+'ms</span>' : '';
+    return 'Called <code>'+esc(e.verb||'?')+'</code> '+esc(e.target||'')+status+dur;
+  }
+  if(e.type==='exception'){
+    return '<span class="exc-msg">&#9888; '+esc(e.exc_type||'Exception')+
+           ': '+esc(e.message||'')+'</span><br><span style="color:var(--ink-2); font-size:12.5px">raised on line '+
+           (e.line||'?')+' in <code>'+esc(e.func||'')+'</code></span>';
+  }
+  return e.type;
+}
+
+function render(){
+  const {stack, frames, changedHere, e} = compute();
+
+  // code highlight (red for exception, accent green otherwise)
+  document.querySelectorAll('.row.cur, .row.cur-exc').forEach(r=>{
+    r.classList.remove('cur'); r.classList.remove('cur-exc');
+  });
+  if(e && e.line){
+    const r = document.querySelector('.row[data-line="'+e.line+'"]');
+    if(r){
+      r.classList.add(e.type==='exception' ? 'cur-exc' : 'cur');
+      r.scrollIntoView({block:'nearest'});
+    }
+  }
+
+  // now
+  const chipCls = e.type==='assign' ? 'chip assign'
+                : e.type==='extcall' ? 'chip extcall'
+                : e.type==='exception' ? 'chip exception'
+                : 'chip';
+  document.getElementById('now').innerHTML =
+    '<span class="'+chipCls+'">'+esc(e.type||'')+'</span>'+
+    '<div id="nowtext">'+nowText(e,stack)+'</div>';
+
+  // Call stack panel: all frames ever called, newest first. The currently
+  // active frame(s) keep the green border; returned ones are dimmed but still
+  // show their final argument / local values, which is critical when an
+  // exception bubbles up and only the innermost frame is live but you want
+  // to know what its callers were called with.
+  const fr = document.getElementById('frames');
+  if(!frames.length){ fr.innerHTML='<div class="empty">No calls yet.</div>'; }
+  else {
+    // Find the innermost active frame (the actual "current" one)
+    let innermostActiveSeq = null;
+    for(const f of frames){ if(f.active) innermostActiveSeq = f.seq; }
+    fr.innerHTML = frames.slice().reverse().map(f => {
+      const isActive = f.active;
+      const isCurrent = f.seq === innermostActiveSeq;
+      const isRaised = !!f.raised;
+      const cls = 'frame' + (isCurrent ? ' top' : '') + (!isActive ? ' returned' : '') + (isRaised ? ' raised' : '');
+      let tag = '';
+      if(isCurrent) tag = '<span class="tag">current</span>';
+      else if(isActive) tag = '<span class="tag">caller</span>';
+      else if(isRaised) tag = '<span class="tag raised">raised</span>';
+      else tag = '<span class="tag returned">returned</span>';
+      const rows = Object.entries(f.vars).map(([nm,v])=>{
+        const isCh = changedHere && changedHere.frameSeq===f.seq && changedHere.name===nm;
+        let valhtml = '<span class="val">'+valStr(v)+'</span>';
+        if(isCh && changedHere.prev!=null)
+          valhtml = '<span class="from">'+valStr(changedHere.prev)+'</span><span class="arrow">&rarr;</span>'+valhtml;
+        return '<div class="var'+(isCh?' changed':'')+'"><span class="nm">'+esc(nm)+'</span>'+
+          valhtml+'<span class="cnt">&times;'+(v.ci||0)+'</span></div>';
+      }).join('') || '<div class="empty">no locals yet</div>';
+      return '<div class="'+cls+'"><div class="fh"><code>'+esc(f.func)+'</code>'+tag+'</div>'+rows+'</div>';
+    }).join('');
+  }
+
+  document.getElementById('cur').textContent = cur;
+  document.getElementById('scrub').value = cur;
+  highlightActivePills();
+}
+
+function go(i){ cur = Math.max(0, Math.min(events.length-1, i)); render(); }
+function step(d){ pause(); go(cur+d); }
+function play(){
+  if(timer) return pause();
+  if(cur>=events.length-1) cur=0;
+  document.getElementById('play').innerHTML='&#10073;&#10073;';
+  const tick=()=>{ if(cur>=events.length-1){ pause(); return; } go(cur+1);
+    timer=setTimeout(tick, +document.getElementById('speed').value); };
+  timer=setTimeout(tick, +document.getElementById('speed').value);
+}
+function pause(){ if(timer){ clearTimeout(timer); timer=null; } document.getElementById('play').innerHTML='&#9658;'; }
+
+document.getElementById('back').onclick=()=>step(-1);
+document.getElementById('fwd').onclick=()=>step(1);
+document.getElementById('play').onclick=play;
+document.getElementById('scrub').oninput=e=>{ pause(); go(+e.target.value); };
+document.getElementById('load').onclick=()=>document.getElementById('file').click();
+document.getElementById('vars').addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-seq]');
+  if(!b) return;
+  pause();
+  go(+b.dataset.seq);
+});
+document.getElementById('jump-exc').addEventListener('click', () => {
+  if(!exceptionSeqs.length) return;
+  const next = exceptionSeqs.find(s => s > cur);
+  pause();
+  go(next != null ? next : exceptionSeqs[0]);
+});
+document.getElementById('file').onchange=ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{ try{ load(JSON.parse(rd.result)); }catch(err){ alert('Could not parse trace: '+err.message); } };
+  rd.readAsText(f);
+};
+window.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'){ step(1); e.preventDefault(); }
+  else if(e.key==='ArrowLeft'){ step(-1); e.preventDefault(); }
+  else if(e.key===' '){ play(); e.preventDefault(); }
+  else if(e.key==='Home'){ pause(); go(0); }
+  else if(e.key==='End'){ pause(); go(events.length-1); }
+});
+
+load(trace);
+
+// Auto-load via ?trace=<path> or ?id=<library-id>.
+(function autoload(){
+  const url = new URL(window.location.href);
+  const id = url.searchParams.get('id');
+  if(id){
+    fetch('/api/traces/' + encodeURIComponent(id))
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(load)
+      .catch(err => console.error('autoload by id failed', err));
+    return;
+  }
+  const tracePath = url.searchParams.get('trace');
+  if(!tracePath) return;
+  fetch(tracePath).then(r => r.json()).then(load).catch(err => {
+    console.error('autoload failed', err);
+  });
+})();
+
+// Collapse / expand right-column sections. Persist per-section via localStorage.
+(function setupCollapse(){
+  const KEY = 'tracesnap_collapsed_v1';
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch(_){}
+  document.querySelectorAll('.rightcol .panel').forEach(panel => {
+    const id = panel.dataset.section;
+    if(!id) return;
+    if(saved[id]) panel.classList.add('collapsed');
+    const cap = panel.querySelector('.cap');
+    if(!cap) return;
+    cap.addEventListener('click', () => {
+      panel.classList.toggle('collapsed');
+      saved[id] = panel.classList.contains('collapsed');
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch(_){}
+    });
+  });
+})();
+
+// Records dropdown (library browser). Talks to /api/traces.
+(function setupRecords(){
+  const btn = document.getElementById('records-btn');
+  const list = document.getElementById('records-list');
+  if(!btn || !list) return;
+  let records = [];
+  let activeId = new URL(location.href).searchParams.get('id') || null;
+
+  function escHtml(s){ return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;'); }
+  function shortPath(p){
+    if(!p) return '';
+    return p.length > 42 ? '…' + p.slice(-41) : p;
+  }
+
+  async function refresh(){
+    try{
+      const r = await fetch('/api/traces');
+      records = r.ok ? await r.json() : [];
+    } catch(e){ records = []; }
+    render();
+  }
+  function render(){
+    if(!records.length){
+      list.innerHTML = '<div class="records-empty">No saved records yet.<br>Run <code>tracesnap record &lt;file.py&gt;</code> to add one.</div>';
+      return;
+    }
+    list.innerHTML = records.map(r => {
+      const isActive = r.id === activeId;
+      return '<div class="record-row'+(isActive?' active':'')+'" data-id="'+escHtml(r.id)+'">' +
+        '<div class="info">' +
+          '<div class="record-name" data-id="'+escHtml(r.id)+'" contenteditable="true" spellcheck="false">'+escHtml(r.name)+'</div>' +
+          '<div class="record-meta">'+escHtml(r.created)+' · '+r.event_count+' events · '+escHtml(r.kind)+(r.source?' · '+escHtml(shortPath(r.source)):'')+'</div>' +
+        '</div>' +
+        '<button class="record-del" data-id="'+escHtml(r.id)+'" title="Delete">&times;</button>' +
+      '</div>';
+    }).join('') +
+    '<div class="records-hint">click a row to load · click the name to rename</div>';
+  }
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    list.classList.toggle('open');
+    if(list.classList.contains('open')) refresh();
+  });
+  document.addEventListener('click', e => {
+    if(!list.contains(e.target) && e.target !== btn) list.classList.remove('open');
+  });
+
+  list.addEventListener('click', async e => {
+    const del = e.target.closest('.record-del');
+    if(del){
+      e.stopPropagation();
+      if(!confirm('Delete this record? This cannot be undone.')) return;
+      await fetch('/api/traces/' + encodeURIComponent(del.dataset.id), {method:'DELETE'});
+      refresh();
+      return;
+    }
+    if(e.target.closest('.record-name')) return;   // let editing happen
+    const row = e.target.closest('.record-row');
+    if(!row) return;
+    const id = row.dataset.id;
+    activeId = id;
+    try{
+      const r = await fetch('/api/traces/' + encodeURIComponent(id));
+      if(r.ok){
+        const trace = await r.json();
+        load(trace);
+        try{ history.replaceState(null, '', '?id=' + encodeURIComponent(id)); }catch(_){}
+      }
+    } catch(_){}
+    list.classList.remove('open');
+    render();
+  });
+
+  // Rename on blur / Enter
+  list.addEventListener('blur', async e => {
+    const nm = e.target.closest && e.target.closest('.record-name');
+    if(!nm) return;
+    const id = nm.dataset.id;
+    const newName = (nm.textContent || '').trim();
+    if(!newName) return;
+    const cur = records.find(r => r.id === id);
+    if(cur && cur.name === newName) return;
+    try{
+      await fetch('/api/traces/' + encodeURIComponent(id), {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name: newName})
+      });
+      refresh();
+    } catch(_){}
+  }, true);
+  list.addEventListener('keydown', e => {
+    if(e.target.classList && e.target.classList.contains('record-name') && e.key === 'Enter'){
+      e.preventDefault(); e.target.blur();
+    }
+  });
+})();
+</script>
+</body>
+</html>

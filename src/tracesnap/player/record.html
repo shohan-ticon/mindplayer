@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tracesnap — New record</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FAF7F0; --card:#FFFDF8; --inset:#F2ECE0;
+  --ink:#211E18; --ink-2:#6B655A; --faint:#E7E0D2;
+  --accent:#0F6E56; --accent-soft:#0F6E5618; --accent-line:#0F6E5640;
+  --amber:#9C5A12; --amber-bg:#F6E6CE; --amber-line:#BA751755;
+  --purple:#7B4B9F; --purple-bg:#7B4B9F18; --purple-line:#7B4B9F55;
+  --danger:#c92a2a;
+  --shadow:0 1px 2px rgba(40,33,20,.05),0 8px 28px rgba(40,33,20,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#1A1815; --card:#221F1B; --inset:#2A2620;
+    --ink:#ECE6DA; --ink-2:#A39C8C; --faint:#332E26;
+    --accent:#5BC6A1; --accent-soft:#5BC6A11f; --accent-line:#5BC6A150;
+    --amber:#E6AE5C; --amber-bg:#3A2E1C; --amber-line:#E6AE5c44;
+    --purple:#C39BE6; --purple-bg:#C39BE61f; --purple-line:#C39BE655;
+    --danger:#f0735c;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:"Hanken Grotesk",system-ui,sans-serif; font-size:15px; line-height:1.55;
+  display:flex; flex-direction:column; min-height:100vh;
+}
+header{
+  display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;
+  padding:20px 28px 14px; border-bottom:1px solid var(--faint);
+}
+header h1{ font-family:"Fraunces",serif; font-weight:600; font-size:24px; margin:0;
+  letter-spacing:-.01em; }
+header .sub{color:var(--ink-2); font-size:13.5px; margin-right:auto}
+.navlink{
+  font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink);
+  background:var(--card); border:1px solid var(--faint); border-radius:9px;
+  padding:7px 13px; cursor:pointer; text-decoration:none; display:inline-block;
+}
+.navlink:hover{ border-color:var(--accent-line) }
+
+main{
+  flex:1; padding:24px 28px; max-width:1100px; width:100%; margin:0 auto;
+}
+.tabs{ display:flex; gap:8px; border-bottom:1px solid var(--faint); margin-bottom:20px }
+.tab{ padding:10px 18px; font:500 14px "Hanken Grotesk",sans-serif;
+  color:var(--ink-2); cursor:pointer; background:none; border:none;
+  border-bottom:2px solid transparent; margin-bottom:-1px }
+.tab:hover{ color:var(--ink) }
+.tab.active{ color:var(--accent); border-bottom-color:var(--accent); font-weight:600 }
+.panel{ background:var(--card); border:1px solid var(--faint); border-radius:14px;
+  box-shadow:var(--shadow); padding:20px; }
+.section-cap{ font:600 11.5px "Hanken Grotesk",sans-serif; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-2); margin:0 0 10px }
+.row{ display:flex; gap:12px; align-items:flex-start; margin-bottom:14px }
+.row > label{ flex:none; width:120px; padding-top:8px; font:500 13px "Hanken Grotesk",sans-serif;
+  color:var(--ink-2) }
+.row > .field{ flex:1; min-width:0 }
+input[type=text], input[type=search], select, textarea{
+  width:100%; font:500 13px "JetBrains Mono",monospace; color:var(--ink);
+  background:var(--paper); border:1px solid var(--faint); border-radius:7px;
+  padding:8px 12px; outline:none;
+}
+input:focus, select:focus, textarea:focus{ border-color:var(--accent); }
+textarea{ min-height:90px; resize:vertical; line-height:1.5 }
+button.primary, button.secondary{
+  font:600 13px "Hanken Grotesk",sans-serif; cursor:pointer;
+  padding:9px 16px; border-radius:8px; border:1px solid var(--faint);
+  background:var(--card); color:var(--ink); transition:border-color .15s,background .15s;
+}
+button.primary{ background:var(--accent); color:#fff; border-color:var(--accent); }
+@media (prefers-color-scheme:dark){ button.primary{ color:#10221C; } }
+button.primary:hover{ filter:brightness(1.05) }
+button.secondary:hover{ border-color:var(--accent-line) }
+button:disabled{ opacity:.5; cursor:wait }
+
+.file-list{ border:1px solid var(--faint); border-radius:9px; overflow:hidden;
+  max-height:340px; overflow-y:auto; background:var(--paper); }
+.file-row{ padding:8px 14px; cursor:pointer; border-top:1px solid var(--faint);
+  font:500 12.5px "JetBrains Mono",monospace; display:flex; align-items:center; gap:8px }
+.file-row:first-child{ border-top:none }
+.file-row:hover{ background:var(--inset) }
+.file-row.selected{ background:var(--accent-soft); color:var(--accent) }
+.file-row .size{ margin-left:auto; color:var(--ink-2); font-weight:400; font-size:11px }
+.file-search{ margin-bottom:12px }
+.muted{ color:var(--ink-2); font-size:13px; padding:14px 16px; text-align:center }
+
+.kv-rows{ display:flex; flex-direction:column; gap:6px }
+.kv{ display:flex; gap:6px }
+.kv input{ font-size:12.5px; padding:6px 10px }
+.kv .k{ flex:1 }
+.kv .v{ flex:2 }
+.kv .del{ width:32px; padding:0; color:var(--ink-2); background:var(--paper);
+  border:1px solid var(--faint); border-radius:6px; cursor:pointer }
+.kv .del:hover{ color:var(--danger); border-color:var(--danger) }
+.addbtn{ font:500 12px "Hanken Grotesk",sans-serif; color:var(--accent);
+  background:transparent; border:1px dashed var(--accent-line); border-radius:7px;
+  padding:5px 10px; cursor:pointer; align-self:flex-start; margin-top:6px }
+
+.actions{ margin-top:18px; display:flex; gap:10px; align-items:center }
+.status{ color:var(--ink-2); font-size:13px; flex:1 }
+.status.error{ color:var(--danger) }
+.status.success{ color:var(--accent) }
+
+.result-card{ margin-top:16px; padding:14px 16px; border:1px solid var(--faint);
+  border-radius:10px; background:var(--paper); }
+.result-card.success{ border-color:var(--accent-line); background:var(--accent-soft) }
+.result-card.fail{ border-color:var(--amber-line); background:var(--amber-bg) }
+.result-card pre{ margin:0; max-height:240px; overflow:auto;
+  font:500 12px "JetBrains Mono",monospace; color:var(--ink) }
+.result-meta{ font:500 12.5px "JetBrains Mono",monospace; color:var(--ink); margin-bottom:8px }
+.result-meta .pill{ display:inline-block; padding:2px 8px; border-radius:5px;
+  background:var(--card); border:1px solid var(--faint); margin-right:6px }
+.result-meta .pill.ok{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent-line) }
+.result-meta .pill.bad{ background:var(--amber-bg); color:var(--amber); border-color:var(--amber-line) }
+.result-link{ display:inline-block; margin-top:8px; font:600 12px "Hanken Grotesk",sans-serif;
+  color:var(--accent); text-decoration:none }
+.result-link:hover{ text-decoration:underline }
+
+.scan-root{ font:500 12px "JetBrains Mono",monospace; color:var(--ink-2); margin-bottom:10px }
+.scan-root b{ color:var(--ink) }
+.hint{ font-size:12px; color:var(--ink-2); margin-top:6px }
+.hint code{ background:var(--inset); padding:1px 5px; border-radius:4px;
+  font:500 11.5px "JetBrains Mono",monospace }
+
+/* Interactive terminal panel */
+.terminal-wrap{ margin-top:18px; border:1px solid var(--faint); border-radius:10px;
+  background:#0e1411; overflow:hidden; display:flex; flex-direction:column }
+@media (prefers-color-scheme:light){ .terminal-wrap{ background:#1c1b16 } }
+.terminal-head{ display:flex; align-items:center; gap:10px;
+  padding:8px 12px; background:rgba(255,255,255,.04);
+  border-bottom:1px solid rgba(255,255,255,.06);
+  font:500 11.5px "JetBrains Mono",monospace; color:#9aa8a4 }
+.terminal-head .dot{ width:9px; height:9px; border-radius:50%;
+  background:#bbb; display:inline-block }
+.terminal-head .dot.live{ background:#3fc28e; box-shadow:0 0 8px #3fc28e88;
+  animation:pulse 1.4s ease-in-out infinite }
+.terminal-head .dot.exit{ background:#888 }
+.terminal-head .dot.killed{ background:#e57373 }
+@keyframes pulse{ 50%{ box-shadow:0 0 0 #3fc28e00 } }
+.terminal-head .status{ flex:1; color:#9aa8a4; font-size:11.5px }
+.terminal-head button{ font:600 11px "Hanken Grotesk",sans-serif;
+  background:transparent; color:#9aa8a4; border:1px solid #2a3531;
+  padding:4px 10px; border-radius:6px; cursor:pointer }
+.terminal-head button:hover{ background:rgba(255,255,255,.05); color:#dfe7e4 }
+.terminal-out{ flex:1; min-height:180px; max-height:340px; overflow:auto;
+  padding:10px 14px; font:500 12.5px "JetBrains Mono",monospace;
+  color:#e8efe9; white-space:pre-wrap; word-break:break-word }
+.terminal-out .out{ color:#e8efe9 }
+.terminal-out .err{ color:#ff8b73 }
+.terminal-out .in{ color:#7cd9ad }
+.terminal-out .in::before{ content:'» '; color:#3fc28e }
+.terminal-out .exit{ color:#9aa8a4; font-style:italic }
+.terminal-prompt{ display:flex; gap:0; align-items:stretch;
+  border-top:1px solid rgba(255,255,255,.08); background:#0a100d }
+.terminal-prompt .arrow{ padding:10px 14px; color:#3fc28e;
+  font:600 13px "JetBrains Mono",monospace }
+.terminal-prompt input{ flex:1; font:500 13px "JetBrains Mono",monospace;
+  background:transparent; border:none; color:#e8efe9; padding:10px 12px 10px 0;
+  outline:none }
+.terminal-prompt input::placeholder{ color:#5a6c66 }
+.terminal-prompt.disabled{ opacity:.5 }
+.terminal-prompt.disabled input{ pointer-events:none }
+</style>
+</head>
+<body>
+<header>
+  <h1>New record</h1>
+  <span class="sub">capture a trace from a script or an HTTP request</span>
+  <a class="navlink" href="player.html">&uarr; Text view</a>
+  <a class="navlink" href="simulator.html">&uarr; Flowchart view</a>
+  <a class="navlink" href="call_graph.html">&uarr; Call graph</a>
+  <a class="navlink" href="event_graph.html">&uarr; Event graph</a>
+</header>
+
+<main>
+  <div class="tabs">
+    <button class="tab active" data-tab="script">Run a script</button>
+    <button class="tab" data-tab="url">Hit a URL</button>
+  </div>
+
+  <!-- ============================== SCRIPT TAB ============================== -->
+  <section id="tab-script" class="panel">
+    <div class="scan-root">Scanning <b id="scan-root">…</b></div>
+
+    <div class="row">
+      <label for="file-search">Search</label>
+      <div class="field file-search">
+        <input id="file-search" type="search" placeholder="filter .py files by name / path" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="row">
+      <label>Files</label>
+      <div class="field">
+        <div class="file-list" id="file-list"><div class="muted">loading…</div></div>
+        <div class="hint">Files under the scan root. Pick one, then fill in a name and click <b>Record</b>.</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <label for="script-name">Name</label>
+      <div class="field">
+        <input id="script-name" type="text" placeholder="(optional) display name in the library">
+      </div>
+    </div>
+
+    <div class="row">
+      <label for="script-redact">Redact</label>
+      <div class="field">
+        <input id="script-redact" type="text" placeholder="comma-separated extra variable names to redact">
+        <div class="hint">Always-redacted defaults: <code>password, token, secret, authorization, api_key</code>.</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="script-record" disabled>Start recording</button>
+      <span class="status" id="script-status">Pick a file to begin.</span>
+    </div>
+
+    <!-- Interactive terminal: streams stdout/stderr live and accepts stdin. -->
+    <div id="terminal" class="terminal-wrap" hidden>
+      <div class="terminal-head">
+        <span class="dot" id="term-dot"></span>
+        <span id="term-title" style="color:#dfe7e4">subprocess</span>
+        <span class="status" id="term-status">idle</span>
+        <button id="term-eof" title="Close stdin so the script's input() raises EOF">Send EOF</button>
+        <button id="term-kill" title="Kill the subprocess">Stop</button>
+      </div>
+      <div class="terminal-out" id="term-out"></div>
+      <form class="terminal-prompt" id="term-prompt-form">
+        <span class="arrow">›</span>
+        <input id="term-input" type="text" autocomplete="off" spellcheck="false"
+               placeholder="type a reply and press Enter — sent to the script's stdin">
+      </form>
+    </div>
+
+    <div id="script-result"></div>
+  </section>
+
+  <!-- ============================== URL TAB ============================== -->
+  <section id="tab-url" class="panel" hidden>
+    <div class="hint" style="margin-bottom:14px">
+      Sends the request through this server (CORS-safe) to your target app. The trace
+      appears in the library <em>only</em> if your app has the <code>tracesnap</code>
+      middleware installed and shares the same <code>$TRACESNAP_HOME</code>.
+    </div>
+
+    <div class="row">
+      <label for="url-method">Method</label>
+      <div class="field" style="display:flex; gap:10px">
+        <select id="url-method" style="flex:none; width:120px">
+          <option>GET</option><option>POST</option><option>PUT</option>
+          <option>PATCH</option><option>DELETE</option><option>HEAD</option>
+          <option>OPTIONS</option>
+        </select>
+        <input id="url-target" type="text" placeholder="http://127.0.0.1:5050/checkout">
+      </div>
+    </div>
+
+    <div class="row">
+      <label>Headers</label>
+      <div class="field"><div class="kv-rows" id="url-headers"></div>
+        <button class="addbtn" id="add-header">+ header</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <label>Query params</label>
+      <div class="field"><div class="kv-rows" id="url-params"></div>
+        <button class="addbtn" id="add-param">+ param</button>
+        <div class="hint">Appended to the URL; ignored for HEAD/OPTIONS.</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <label for="url-body">Body</label>
+      <div class="field">
+        <textarea id="url-body" placeholder='Optional raw body. For JSON: {"key": "value"}'></textarea>
+        <div class="hint">JSON content-type is auto-set when the body parses as JSON and no <code>Content-Type</code> header is given.</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="url-send">Send</button>
+      <span class="status" id="url-status">Configure the request, then click Send.</span>
+    </div>
+
+    <div id="url-result"></div>
+  </section>
+</main>
+
+<script>
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function el(tag, props){
+  const e = document.createElement(tag);
+  if(props) for(const k in props){
+    if(k==='class') e.className = props[k];
+    else if(k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(), props[k]);
+    else e.setAttribute(k, props[k]);
+  }
+  return e;
+}
+
+// -------------------------- Tabs --------------------------
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('tab-script').hidden = (t.dataset.tab !== 'script');
+    document.getElementById('tab-url').hidden = (t.dataset.tab !== 'url');
+  });
+});
+
+// -------------------------- Script tab --------------------------
+const fileListEl = document.getElementById('file-list');
+const fileSearchEl = document.getElementById('file-search');
+const recordBtn = document.getElementById('script-record');
+const scriptStatusEl = document.getElementById('script-status');
+const scriptResultEl = document.getElementById('script-result');
+let _files = [];
+let _selectedFile = null;
+
+function renderFiles(filter){
+  const q = (filter || '').toLowerCase();
+  const matches = _files.filter(f => !q || f.rel.toLowerCase().includes(q));
+  if(!matches.length){
+    fileListEl.innerHTML = '<div class="muted">No .py files found.</div>';
+    return;
+  }
+  fileListEl.innerHTML = matches.map(f => {
+    const sel = f.path === _selectedFile ? ' selected' : '';
+    return `<div class="file-row${sel}" data-path="${esc(f.path)}">
+      <span>${esc(f.rel)}</span>
+      <span class="size">${(f.size/1024).toFixed(1)} KB</span>
+    </div>`;
+  }).join('');
+}
+
+fileListEl.addEventListener('click', e => {
+  const row = e.target.closest('.file-row');
+  if(!row) return;
+  _selectedFile = row.dataset.path;
+  document.querySelectorAll('.file-row').forEach(r => r.classList.toggle('selected', r === row));
+  recordBtn.disabled = false;
+  scriptStatusEl.textContent = 'Ready: ' + row.querySelector('span').textContent;
+  scriptStatusEl.className = 'status';
+});
+
+fileSearchEl.addEventListener('input', () => renderFiles(fileSearchEl.value));
+
+async function loadSources(){
+  fileListEl.innerHTML = '<div class="muted">loading…</div>';
+  try{
+    const r = await fetch('/api/sources');
+    const d = await r.json();
+    document.getElementById('scan-root').textContent = d.cwd;
+    _files = d.files || [];
+    renderFiles(fileSearchEl.value);
+  } catch(e){
+    fileListEl.innerHTML = '<div class="muted">Could not load file list. Is the server running?</div>';
+  }
+}
+
+// Interactive terminal state
+const terminalEl = document.getElementById('terminal');
+const termOut = document.getElementById('term-out');
+const termDot = document.getElementById('term-dot');
+const termTitle = document.getElementById('term-title');
+const termStatus = document.getElementById('term-status');
+const termInput = document.getElementById('term-input');
+const termPromptForm = document.getElementById('term-prompt-form');
+const termEofBtn = document.getElementById('term-eof');
+const termKillBtn = document.getElementById('term-kill');
+
+let _job = null;     // {id, evtSource}
+
+function appendTerm(kind, text){
+  if(!text) return;
+  const span = document.createElement('span');
+  span.className = kind;
+  // For "in" lines, ensure they end with newline visually
+  span.textContent = text;
+  termOut.appendChild(span);
+  // Auto-scroll
+  termOut.scrollTop = termOut.scrollHeight;
+}
+
+function setTermStatus(state, msg){
+  termDot.className = 'dot ' + state;
+  termStatus.textContent = msg;
+  const disabled = (state !== 'live');
+  termPromptForm.classList.toggle('disabled', disabled);
+  termInput.disabled = disabled;
+  termEofBtn.disabled = disabled;
+  termKillBtn.disabled = (state === 'exit' || state === 'killed');
+}
+
+function startJob({path, name, redact}){
+  // Reset terminal
+  termOut.innerHTML = '';
+  scriptResultEl.innerHTML = '';
+  terminalEl.hidden = false;
+  termTitle.textContent = path.split('/').pop();
+  setTermStatus('live', 'starting…');
+  termInput.value = '';
+
+  fetch('/api/run/script/start', {
+    method: 'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({path, name, redact})
+  }).then(r => r.json()).then(d => {
+    if(!d.job_id){
+      setTermStatus('killed', 'failed to start');
+      return;
+    }
+    _job = {id: d.job_id};
+    setTermStatus('live', 'running · job ' + d.job_id);
+    const es = new EventSource('/api/run/script/stream/' + d.job_id);
+    _job.evtSource = es;
+    es.addEventListener('out', e => { appendTerm('out', JSON.parse(e.data).text); });
+    es.addEventListener('err', e => { appendTerm('err', JSON.parse(e.data).text); });
+    es.addEventListener('in',  e => { appendTerm('in',  JSON.parse(e.data).text); });
+    es.addEventListener('exit', e => {
+      const d = JSON.parse(e.data);
+      const ok = d.returncode === 0;
+      setTermStatus(ok ? 'exit' : 'killed',
+        ok ? `exited cleanly (returncode 0)` : `exited with code ${d.returncode}`);
+      appendTerm('exit', `\n[process exited with code ${d.returncode}]\n`);
+      es.close();
+      _job = null;
+      finishCard(d);
+    });
+    es.onerror = () => {
+      setTermStatus('killed', 'stream disconnected');
+      es.close();
+    };
+    setTimeout(() => termInput.focus(), 50);
+  }).catch(err => {
+    setTermStatus('killed', 'network error: ' + err.message);
+  });
+}
+
+function finishCard(d){
+  const newId = d.new_id;
+  const ok = d.returncode === 0;
+  scriptStatusEl.textContent = ok ? 'Done.' : `Script exited with code ${d.returncode}.`;
+  scriptStatusEl.className = 'status ' + (ok ? 'success' : 'error');
+  let html = '<div class="result-card ' + (ok ? 'success' : 'fail') + '">';
+  if(newId){
+    const meta = (d.added && d.added[0]) || {};
+    html += `<div class="result-meta">
+      Saved as <b>${esc(meta.name || newId)}</b>
+      <span class="pill ok">id ${esc(newId)}</span>
+      <span class="pill">${meta.event_count || 0} events</span>
+    </div>`;
+    html += `<a class="result-link" href="call_graph.html?id=${encodeURIComponent(newId)}">Open in call graph &rarr;</a> &nbsp;`;
+    html += `<a class="result-link" href="event_graph.html?id=${encodeURIComponent(newId)}">event graph &rarr;</a> &nbsp;`;
+    html += `<a class="result-link" href="simulator.html?id=${encodeURIComponent(newId)}">simulator &rarr;</a> &nbsp;`;
+    html += `<a class="result-link" href="player.html?id=${encodeURIComponent(newId)}">text view &rarr;</a>`;
+  } else {
+    html += '<div class="result-meta">No trace saved.</div>';
+  }
+  html += '</div>';
+  scriptResultEl.innerHTML = html;
+  recordBtn.disabled = false;
+}
+
+recordBtn.addEventListener('click', () => {
+  if(!_selectedFile) return;
+  if(_job){
+    // Already running — clicking again kills + restarts
+    fetch('/api/run/script/kill/' + _job.id, {method:'POST'}).catch(()=>{});
+  }
+  recordBtn.disabled = true;
+  scriptStatusEl.textContent = 'Running… interact with the terminal below.';
+  scriptStatusEl.className = 'status';
+  const name = document.getElementById('script-name').value.trim();
+  const redact = document.getElementById('script-redact').value.trim();
+  startJob({path: _selectedFile, name, redact});
+});
+
+// Send stdin on Enter
+termPromptForm.addEventListener('submit', ev => {
+  ev.preventDefault();
+  if(!_job) return;
+  const text = termInput.value;
+  termInput.value = '';
+  // Append newline so input() returns
+  const payload = text + '\n';
+  fetch('/api/run/script/stdin/' + _job.id, {
+    method: 'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({data: payload})
+  }).catch(() => {});
+});
+
+termEofBtn.addEventListener('click', () => {
+  if(!_job) return;
+  fetch('/api/run/script/eof/' + _job.id, {method:'POST'}).catch(()=>{});
+  appendTerm('exit', '[stdin closed]\n');
+});
+
+termKillBtn.addEventListener('click', () => {
+  if(!_job) return;
+  fetch('/api/run/script/kill/' + _job.id, {method:'POST'}).catch(()=>{});
+});
+
+loadSources();
+
+// -------------------------- URL tab --------------------------
+const headersEl = document.getElementById('url-headers');
+const paramsEl = document.getElementById('url-params');
+const urlStatus = document.getElementById('url-status');
+const urlResult = document.getElementById('url-result');
+
+function kvRow(parent, k='', v=''){
+  const row = el('div', {class:'kv'});
+  const ki = el('input', {type:'text', class:'k', placeholder:'key', value:k});
+  const vi = el('input', {type:'text', class:'v', placeholder:'value', value:v});
+  const del = el('button', {class:'del', title:'Remove', onclick: () => row.remove()});
+  del.innerHTML = '&times;';
+  row.appendChild(ki); row.appendChild(vi); row.appendChild(del);
+  parent.appendChild(row);
+}
+document.getElementById('add-header').addEventListener('click', () => kvRow(headersEl));
+document.getElementById('add-param').addEventListener('click', () => kvRow(paramsEl));
+kvRow(headersEl);
+kvRow(paramsEl);
+
+function collectKv(container){
+  const out = {};
+  container.querySelectorAll('.kv').forEach(row => {
+    const k = row.querySelector('.k').value.trim();
+    const v = row.querySelector('.v').value;
+    if(k) out[k] = v;
+  });
+  return out;
+}
+
+function buildUrl(base, params){
+  if(!Object.keys(params).length) return base;
+  const u = new URL(base, location.origin);
+  for(const k in params) u.searchParams.append(k, params[k]);
+  return u.toString();
+}
+
+document.getElementById('url-send').addEventListener('click', async () => {
+  const method = document.getElementById('url-method').value;
+  const target = document.getElementById('url-target').value.trim();
+  if(!target){ urlStatus.textContent = 'Enter a URL.'; urlStatus.className='status error'; return; }
+  const headers = collectKv(headersEl);
+  const params = collectKv(paramsEl);
+  let body = document.getElementById('url-body').value;
+  // Auto-set Content-Type for JSON-looking bodies if not provided
+  if(body && body.trim().length){
+    try { JSON.parse(body); if(!headers['Content-Type'] && !headers['content-type']) headers['Content-Type'] = 'application/json'; }
+    catch(_){ /* not JSON, leave headers untouched */ }
+  } else {
+    body = null;
+  }
+  const url = buildUrl(target, params);
+  urlStatus.textContent = 'Sending…';
+  urlStatus.className = 'status';
+  urlResult.innerHTML = '';
+  try{
+    const resp = await fetch('/api/run/request', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({method, url, headers, body})
+    });
+    const d = await resp.json();
+    const ok = d.ok && d.status >= 200 && d.status < 400;
+    urlStatus.textContent = ok ? 'Done.' : 'Request finished with errors.';
+    urlStatus.className = 'status ' + (ok ? 'success' : 'error');
+    let html = '<div class="result-card ' + (ok ? 'success' : 'fail') + '">';
+    html += `<div class="result-meta">
+      <span class="pill ${ok?'ok':'bad'}">${esc(String(d.status||0))} ${esc(d.reason||'')}</span>
+      <span class="pill">${esc(method)}</span>
+      <span class="pill">${esc(url)}</span>
+      ${d.body_size != null ? '<span class="pill">'+d.body_size+' B</span>' : ''}
+    </div>`;
+    if(d.new_id){
+      const meta = (d.added && d.added[0]) || {};
+      html += `<div style="margin-bottom:8px"><b>${esc(meta.name || d.new_id)}</b> saved to library.</div>`;
+      html += `<a class="result-link" href="call_graph.html?id=${encodeURIComponent(d.new_id)}">Open in call graph &rarr;</a> &nbsp;`;
+      html += `<a class="result-link" href="event_graph.html?id=${encodeURIComponent(d.new_id)}">event graph &rarr;</a> &nbsp;`;
+      html += `<a class="result-link" href="simulator.html?id=${encodeURIComponent(d.new_id)}">simulator &rarr;</a> &nbsp;`;
+      html += `<a class="result-link" href="player.html?id=${encodeURIComponent(d.new_id)}">text view &rarr;</a>`;
+    } else {
+      html += `<div class="hint" style="margin-bottom:8px">No new trace appeared in the library. If your app uses tracesnap middleware, check that it shares <code>$TRACESNAP_HOME</code>. Otherwise this request was just a smoke-test.</div>`;
+    }
+    if(d.body){
+      html += '<pre style="margin-top:10px">'+esc(d.body.slice(0, 8000))+(d.body.length>8000 ? '\n…(truncated)' : '')+'</pre>';
+    }
+    if(d.error){
+      html += '<pre style="margin-top:8px; color:var(--danger)">'+esc(d.error)+'</pre>';
+    }
+    html += '</div>';
+    urlResult.innerHTML = html;
+  } catch(e){
+    urlStatus.textContent = 'Network error: ' + e.message;
+    urlStatus.className = 'status error';
+  }
+});
+</script>
+</body>
+</html>

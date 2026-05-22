@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tracesnap"
+version = "0.1.0"
+description = "Record once, replay anywhere: a time-travel debugger for Python with a visual browser-based player."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "tracesnap contributors" }]
+keywords = ["debugger", "trace", "replay", "time-travel", "flask", "django", "fastapi", "observability"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Debuggers",
+]
+dependencies = []   # core has no runtime deps
+
+[project.optional-dependencies]
+flask = ["flask>=2.0"]
+django = ["django>=4.0"]
+fastapi = ["fastapi>=0.95", "httpx>=0.24"]
+all = ["flask>=2.0", "django>=4.0", "fastapi>=0.95", "httpx>=0.24"]
+dev = ["pytest>=7", "ruff", "build", "twine", "flask>=2.0", "django>=4.0", "fastapi>=0.95", "httpx>=0.24"]
+
+[project.scripts]
+tracesnap = "tracesnap.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yourname/tracesnap"
+Issues = "https://github.com/yourname/tracesnap/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tracesnap"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "examples", "docs", "README.md", "CHANGELOG.md", "LICENSE"]
+
+[tool.hatch.build]
+# Ensure player HTMLs are bundled
+artifacts = ["src/tracesnap/player/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"

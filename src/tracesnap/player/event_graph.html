@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trace Event Graph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FAF7F0; --card:#FFFDF8; --inset:#F2ECE0;
+  --ink:#211E18; --ink-2:#6B655A; --faint:#E7E0D2;
+  --accent:#0F6E56; --accent-soft:#0F6E5618; --accent-line:#0F6E5640;
+  --amber:#9C5A12; --amber-bg:#F6E6CE; --amber-line:#BA751755;
+  --purple:#7B4B9F; --purple-bg:#7B4B9F18; --purple-line:#7B4B9F55;
+  --rose:#B5394E; --rose-bg:#B5394E18; --rose-line:#B5394E55;
+  --slate:#3F4756; --slate-bg:#3F475618; --slate-line:#3F475655;
+  --exc:#c92a2a;  --exc-bg:#c92a2a22; --exc-line:#c92a2a66;
+  --shadow:0 1px 2px rgba(40,33,20,.05),0 8px 28px rgba(40,33,20,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#1A1815; --card:#221F1B; --inset:#2A2620;
+    --ink:#ECE6DA; --ink-2:#A39C8C; --faint:#332E26;
+    --accent:#5BC6A1; --accent-soft:#5BC6A11f; --accent-line:#5BC6A150;
+    --amber:#E6AE5C; --amber-bg:#3A2E1C; --amber-line:#E6AE5c44;
+    --purple:#C39BE6; --purple-bg:#C39BE61f; --purple-line:#C39BE655;
+    --rose:#E48198; --rose-bg:#E481981f; --rose-line:#E4819855;
+    --slate:#A5B0C2; --slate-bg:#A5B0C21f; --slate-line:#A5B0C255;
+    --exc:#FF8A8A;  --exc-bg:#FF8A8A22; --exc-line:#FF8A8A66;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:"Hanken Grotesk",system-ui,sans-serif; font-size:15px; line-height:1.55;
+  display:flex; flex-direction:column; height:100vh; overflow:hidden;
+}
+header{
+  display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;
+  padding:20px 28px 14px; border-bottom:1px solid var(--faint);
+}
+header h1{
+  font-family:"Fraunces",serif; font-weight:600; font-size:24px; margin:0;
+  letter-spacing:-.01em;
+}
+header .sub{color:var(--ink-2); font-size:13.5px; margin-right:auto}
+.loadbtn{
+  font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink);
+  background:var(--card); border:1px solid var(--faint); border-radius:9px;
+  padding:7px 13px; cursor:pointer; text-decoration:none; display:inline-block;
+  transition:border-color .15s,transform .05s;
+}
+.loadbtn:hover{border-color:var(--accent-line)}
+.kbd{color:var(--ink-2); font-size:12px; display:flex; gap:10px; align-items:center}
+.kbd b{font:500 11px "JetBrains Mono",monospace; background:var(--inset);
+  border:1px solid var(--faint); border-radius:5px; padding:1px 6px; color:var(--ink)}
+
+/* Records dropdown */
+.records-menu{ position:relative }
+.records-list{
+  position:absolute; top:calc(100% + 6px); right:0;
+  background:var(--card); border:1px solid var(--faint); border-radius:9px;
+  box-shadow:var(--shadow); min-width:340px; max-height:60vh; overflow-y:auto;
+  z-index:1000; display:none;
+}
+.records-list.open{ display:block }
+.records-empty{ padding:18px; color:var(--ink-2); font-size:13px; text-align:center; line-height:1.5 }
+.records-empty code{ font-family:"JetBrains Mono",monospace; font-size:12px;
+  background:var(--inset); padding:2px 6px; border-radius:4px }
+.record-row{ display:flex; align-items:center; gap:10px; padding:9px 12px;
+  cursor:pointer; border-top:1px solid var(--faint); transition:background .15s }
+.record-row:first-child{ border-top:none }
+.record-row:hover{ background:var(--inset) }
+.record-row.active{ background:var(--accent-soft) }
+.record-row .info{ flex:1; min-width:0 }
+.record-name{ font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:1px 2px;
+  border-radius:3px; outline:none }
+.record-name[contenteditable="true"]:focus{ background:var(--paper);
+  outline:1px solid var(--accent); outline-offset:0 }
+.record-meta{ font:400 11px "JetBrains Mono",monospace; color:var(--ink-2);
+  margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.record-del{ background:none; border:none; color:var(--ink-2); cursor:pointer;
+  font-size:18px; line-height:1; padding:2px 8px; border-radius:5px }
+.record-del:hover{ color:#c92a2a; background:var(--inset) }
+.records-hint{ padding:8px 12px; border-top:1px solid var(--faint);
+  font:400 11px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  background:var(--inset) }
+
+main{
+  --col-src: 360px;
+  --col-det: 340px;
+  flex:1; min-height:0; display:grid;
+  grid-template-columns: var(--col-src) 8px 1fr 8px var(--col-det);
+  gap:14px; padding:18px 24px; max-width:1640px; width:100%; margin:0 auto;
+}
+@media (max-width:1200px){
+  main{ --col-src: 280px; --col-det: 300px; gap:12px; padding:14px 18px }
+}
+@media (max-width:860px){
+  main{ grid-template-columns:1fr; overflow-y:auto }
+  body{ overflow:auto; height:auto; min-height:100vh }
+  .dragger{ display:none }
+}
+
+.dragger{ position:relative; cursor:col-resize; align-self:stretch;
+  display:flex; align-items:center; justify-content:center; user-select:none }
+.dragger::after{ content:''; width:2px; height:38px; border-radius:2px;
+  background:var(--faint); transition:background .15s }
+.dragger:hover::after, .dragger.dragging::after{ background:var(--accent); width:3px }
+.dragger::before{ content:''; position:absolute; top:0; bottom:0; left:-4px; right:-4px }
+.panel{ background:var(--card); border:1px solid var(--faint);
+  border-radius:14px; box-shadow:var(--shadow); overflow:hidden;
+  display:flex; flex-direction:column; min-height:0 }
+.panel .cap{ font:600 11.5px "Hanken Grotesk",sans-serif; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--accent); padding:13px 16px 8px;
+  border-bottom:1px solid var(--faint); background:var(--inset); flex:none }
+
+/* source code panel (left) */
+.panel.source{ overflow:hidden }
+#code{ flex:1; font-family:"JetBrains Mono",monospace; font-size:12.5px; line-height:1.85;
+  padding:10px 6px 14px; background:var(--paper); overflow:auto }
+.row{ display:flex; align-items:center; white-space:pre; position:relative;
+  padding:0 14px 0 0; transition:background .25s ease }
+.row .ln{ width:38px; text-align:right; padding-right:14px; color:var(--ink-2);
+  opacity:.55; user-select:none; flex:none }
+.row .src{ flex:1 }
+.row.cur{ background:var(--accent-soft) }
+.row.cur .ln{ opacity:1; color:var(--accent); font-weight:700 }
+.row .bar{ position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent;
+  transition:background .25s }
+.row.cur .bar{ background:var(--accent) }
+
+.legend{ display:flex; gap:10px 16px; align-items:center; flex-wrap:wrap;
+  padding:10px 16px; border-bottom:1px solid var(--faint);
+  background:var(--card); flex:none; font:500 11px "Hanken Grotesk",sans-serif;
+  color:var(--ink-2); letter-spacing:.04em; text-transform:uppercase }
+.legend .group{ display:flex; gap:14px; align-items:center; flex-wrap:wrap }
+.legend .sep{ width:1px; height:18px; background:var(--faint) }
+.legend .item{ display:inline-flex; align-items:center; gap:6px }
+.legend .swatch{ display:inline-block; width:12px; height:12px; border-radius:3px;
+  border:1px solid var(--faint); background:var(--card) }
+.legend .swatch.call{ background:var(--accent-soft); border-color:var(--accent) }
+.legend .swatch.ret { background:var(--amber-bg);   border-color:var(--amber)  }
+.legend .swatch.branch{ background:var(--purple-bg);border-color:var(--purple); border-radius:50% }
+.legend .swatch.loop{ background:var(--purple-bg);  border-color:var(--purple) }
+.legend .swatch.assign{ background:var(--slate-bg); border-color:var(--slate) }
+.legend .swatch.ext{ background:var(--rose-bg);     border-color:var(--rose);  border-radius:50% }
+.legend .swatch.exc{ background:var(--exc-bg);      border-color:var(--exc) }
+.legend .swatch.line{ background:var(--inset);      border-color:var(--faint); border-radius:50% }
+.legend .filter{ display:inline-flex; align-items:center; gap:6px;
+  cursor:pointer; padding:3px 7px; border-radius:6px; border:1px solid var(--faint);
+  background:var(--card); user-select:none; text-transform:none; letter-spacing:0;
+  color:var(--ink-2); font:500 11px "Hanken Grotesk",sans-serif }
+.legend .filter input{ pointer-events:none }
+.legend .filter:hover{ border-color:var(--accent-line) }
+.legend .filter.on{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent) }
+
+#status{ padding:9px 16px; border-bottom:1px solid var(--faint);
+  background:var(--paper); flex:none;
+  font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink);
+  min-height:36px; display:flex; align-items:center; gap:8px }
+#status .tag{ font:600 10px "JetBrains Mono",monospace; padding:2px 7px;
+  border-radius:5px; background:var(--accent-soft); color:var(--accent);
+  letter-spacing:.05em; text-transform:uppercase }
+#status .hint{ color:var(--ink-2); margin-left:auto; font-size:12px }
+
+#canvas-wrap{ flex:1; overflow:hidden; padding:0; background:var(--paper);
+  position:relative; cursor:grab }
+#canvas-wrap.panning{ cursor:grabbing }
+#canvas{ display:block; width:100%; height:100%; cursor:inherit }
+
+.zoom-bar{ position:absolute; top:10px; right:10px; z-index:10;
+  display:flex; align-items:center; gap:2px; padding:4px;
+  background:var(--card); border:1px solid var(--faint); border-radius:9px;
+  box-shadow:var(--shadow); user-select:none }
+.zoom-bar button{ width:30px; height:28px; border-radius:5px; border:none;
+  background:transparent; color:var(--ink); cursor:pointer;
+  font:600 14px "JetBrains Mono",monospace;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .15s }
+.zoom-bar button:hover{ background:var(--inset) }
+.zoom-bar button:active{ background:var(--accent-soft); color:var(--accent) }
+.zoom-bar #zoom-level{ font:500 11px "JetBrains Mono",monospace; color:var(--ink-2);
+  padding:0 6px; min-width:42px; text-align:center }
+
+/* SVG event nodes / edges */
+.ev-edge{ fill:none; stroke:var(--ink-2); stroke-width:1; opacity:.30; transition:stroke .2s,opacity .2s }
+.ev-edge.past{ stroke:var(--accent); opacity:.55 }
+.ev-edge.active{ stroke:var(--accent); stroke-width:1.8; opacity:1 }
+
+.ev-node{ cursor:pointer; transition:opacity .15s }
+.ev-node .bg{ stroke-width:1.3; transition:stroke-width .15s, filter .15s }
+.ev-node:hover .bg{ stroke-width:2 }
+.ev-node.dimmed{ opacity:.32 }
+.ev-node.current .bg{ stroke-width:2.5; filter:drop-shadow(0 0 4px var(--accent-line)) }
+.ev-node.selected .bg{ stroke-width:2.5 }
+
+.ev-node.call    .bg{ fill:var(--accent-soft); stroke:var(--accent) }
+.ev-node.return  .bg{ fill:var(--amber-bg);   stroke:var(--amber)  }
+.ev-node.branch  .bg{ fill:var(--purple-bg); stroke:var(--purple) }
+.ev-node.loop    .bg{ fill:var(--purple-bg); stroke:var(--purple) }
+.ev-node.assign  .bg{ fill:var(--slate-bg);  stroke:var(--slate) }
+.ev-node.extcall .bg{ fill:var(--rose-bg);   stroke:var(--rose) }
+.ev-node.exception .bg{ fill:var(--exc-bg);  stroke:var(--exc); stroke-width:1.8 }
+.ev-node.exception .ev-label{ fill:var(--exc) }
+.ev-node.line    .bg{ fill:var(--inset);     stroke:var(--faint) }
+
+.ev-label{ font:600 11px "JetBrains Mono",monospace; fill:var(--ink); pointer-events:none }
+.ev-sub{ font:500 9.5px "JetBrains Mono",monospace; fill:var(--ink-2); pointer-events:none }
+
+/* Details panel */
+.details{ height:100%; display:flex; flex-direction:column; overflow:hidden }
+.details .cap{ display:flex; align-items:center; justify-content:space-between }
+.details .cap button{ font:500 11px "Hanken Grotesk",sans-serif;
+  background:var(--card); border:1px solid var(--faint); border-radius:7px;
+  padding:3px 10px; cursor:pointer; color:var(--ink-2) }
+.details .body{ flex:1; overflow-y:auto; padding:14px 16px }
+.details .empty{ color:var(--ink-2); font-size:13px; padding:14px 0 }
+.details h3{ margin:0 0 8px; font:600 16px "JetBrains Mono",monospace; color:var(--ink) }
+.details .summary{ font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  margin-bottom:14px }
+.kv{ display:grid; grid-template-columns: 90px 1fr; gap:4px 10px;
+  font:500 12px "JetBrains Mono",monospace; margin:2px 0 }
+.kv .k{ color:var(--ink-2) }
+.kv .v{ color:var(--ink); word-break:break-all }
+.kv .v.redacted{ font-style:italic; color:var(--ink-2) }
+.kv .v.amber{ color:var(--amber) }
+.kv .v.accent{ color:var(--accent) }
+.section{ border:1px solid var(--faint); border-radius:10px; padding:10px 12px;
+  margin-bottom:10px; background:var(--paper) }
+.section .head{ display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:6px }
+.section .head .ttl{ font:600 11px "JetBrains Mono",monospace; color:var(--accent);
+  letter-spacing:.06em; text-transform:uppercase }
+.section .head .scrubto{ font:500 11px "Hanken Grotesk",sans-serif;
+  background:var(--card); border:1px solid var(--faint); border-radius:6px;
+  padding:2px 8px; cursor:pointer; color:var(--ink) }
+.section .head .scrubto:hover{ border-color:var(--accent-line) }
+
+footer{ position:sticky; bottom:0; background:var(--card);
+  border-top:1px solid var(--faint); padding:13px 28px;
+  display:flex; align-items:center; gap:16px;
+  box-shadow:0 -6px 22px rgba(40,33,20,.05) }
+.tbtn{ width:38px; height:38px; border-radius:10px; border:1px solid var(--faint);
+  background:var(--paper); color:var(--ink); cursor:pointer; font-size:15px;
+  display:flex; align-items:center; justify-content:center;
+  transition:border-color .15s,transform .05s }
+.tbtn:hover{ border-color:var(--accent-line) }
+.tbtn:active{ transform:translateY(1px) }
+.tbtn.play{ background:var(--accent); color:#fff; border-color:var(--accent); width:46px }
+@media (prefers-color-scheme:dark){ .tbtn.play{ color:#10221C } }
+#scrub{ flex:1; accent-color:var(--accent); height:4px; cursor:pointer }
+.count{ font:500 13px "JetBrains Mono",monospace; color:var(--ink-2);
+  min-width:96px; text-align:right }
+.count b{ color:var(--ink) }
+.speed{ font:500 12px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  background:var(--paper); border:1px solid var(--faint); border-radius:8px;
+  padding:6px 8px; cursor:pointer }
+</style>
+</head>
+<body>
+<header>
+  <h1>Event Graph</h1>
+  <span class="sub">every event &middot; nested by structure</span>
+  <a class="loadbtn" href="player.html">&uarr; Text view</a>
+  <a class="loadbtn" href="simulator.html">&uarr; Flowchart view</a>
+  <a class="loadbtn" href="call_graph.html">&uarr; Call graph</a>
+  <a class="loadbtn" href="record.html" style="border-color:var(--accent-line); color:var(--accent)">+ New record</a>
+  <div class="records-menu">
+    <button class="loadbtn" id="records-btn">Records &#x25BE;</button>
+    <div class="records-list" id="records-list"></div>
+  </div>
+  <button class="loadbtn" id="load">Load trace.json</button>
+  <input type="file" id="file" accept=".json" hidden>
+  <span class="kbd"><b>&larr;</b><b>&rarr;</b> step <b>space</b> play</span>
+</header>
+
+<main>
+  <section class="panel source">
+    <div class="cap">Source</div>
+    <div id="code"></div>
+  </section>
+  <div class="dragger" data-side="src" title="Drag to resize"></div>
+  <section class="panel">
+    <div class="cap">Event tree</div>
+    <div class="legend">
+      <div class="group">
+        <span class="item"><span class="swatch call"></span>call</span>
+        <span class="item"><span class="swatch ret"></span>return</span>
+        <span class="item"><span class="swatch branch"></span>branch</span>
+        <span class="item"><span class="swatch loop"></span>loop</span>
+        <span class="item"><span class="swatch assign"></span>assign</span>
+        <span class="item"><span class="swatch ext"></span>extcall</span>
+        <span class="item"><span class="swatch exc"></span>exception</span>
+        <span class="item"><span class="swatch line"></span>line</span>
+      </div>
+      <span class="sep"></span>
+      <label class="filter on" data-type="assign"><input type="checkbox" checked> assigns</label>
+      <label class="filter" data-type="line"><input type="checkbox"> lines</label>
+    </div>
+    <div id="status">&nbsp;</div>
+    <div id="canvas-wrap">
+      <div class="zoom-bar">
+        <button id="zoom-out" title="Zoom out (− key)">&minus;</button>
+        <span id="zoom-level">100%</span>
+        <button id="zoom-in" title="Zoom in (+ key)">+</button>
+        <button id="zoom-fit" title="Fit to view (0 key)">&#9974;</button>
+      </div>
+      <svg id="canvas" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </section>
+  <div class="dragger" data-side="det" title="Drag to resize"></div>
+  <section class="panel details">
+    <div class="cap">
+      <span>Event details</span>
+      <button id="close-details" hidden>Close</button>
+    </div>
+    <div class="body" id="details-body">
+      <div class="empty">Click an event to inspect its payload, or use the scrubber to follow execution. The current event is highlighted.</div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <button class="tbtn" id="back" title="Step back (&larr;)">&#9664;</button>
+  <button class="tbtn play" id="play" title="Play / pause (space)">&#9658;</button>
+  <button class="tbtn" id="fwd" title="Step forward (&rarr;)">&#9654;</button>
+  <input type="range" id="scrub" min="0" value="0">
+  <select class="speed" id="speed" title="Playback speed">
+    <option value="700">0.5&times;</option>
+    <option value="380" selected>1&times;</option>
+    <option value="180">2&times;</option>
+    <option value="70">4&times;</option>
+  </select>
+  <span class="count">step <b id="cur">0</b> / <span id="tot">0</span></span>
+</footer>
+
+<script>
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function svg(tag, attrs, parent){
+  const e = document.createElementNS(SVG_NS, tag);
+  if(attrs) for(const k in attrs) e.setAttribute(k, attrs[k]);
+  if(parent) parent.appendChild(e);
+  return e;
+}
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function truncate(s, n){ s = String(s||''); return s.length > n ? s.slice(0, n-1) + '…' : s; }
+
+let trace = null, events = [], lines = [], cur = 0, timer = null;
+let firstRender = true;
+let selectedSeq = null;
+let filters = { assign: true, line: false };   // assigns visible by default; lines hidden
+const zoomState = {scale: 1, panX: 0, panY: 0};
+
+// Computed graph state for the currently-visible event set:
+//   nodes: Map<seq, { ev, parent, children:[], x, y, w, h, depth, visible }>
+//   roots: seq[]
+let graph = { nodes: new Map(), roots: [], width: 900, height: 600 };
+
+// -------------------------- Graph construction --------------------------
+
+// For each event, its structural parent in the tree is:
+//   - parent_seq when present (innermost enclosing branch/loop in same frame),
+//   - else the enclosing call event (top of the call stack at that point),
+//   - else null (top-level).
+//
+// We then filter out hidden event types and re-link orphans to their nearest
+// visible ancestor so the tree stays connected.
+function buildEventTree(events){
+  const parentBySeq = new Map();
+  const visibleByType = type => {
+    if(type === 'assign') return filters.assign;
+    if(type === 'line')   return filters.line;
+    return true;
+  };
+  // First pass: compute the "raw" structural parent for every event using
+  // a synthetic call stack of seqs.
+  const stack = [];   // seqs of currently-open call events
+  for(const e of events){
+    let p = (e.parent_seq != null) ? e.parent_seq
+          : (stack.length ? stack[stack.length-1] : null);
+    parentBySeq.set(e.seq, p);
+    if(e.type === 'call') stack.push(e.seq);
+    else if(e.type === 'return') stack.pop();
+  }
+  // Second pass: build node records, hop over hidden ancestors.
+  const nodes = new Map();
+  const roots = [];
+  for(const e of events){
+    if(!visibleByType(e.type)) continue;
+    // climb until we find a visible ancestor (or run out)
+    let p = parentBySeq.get(e.seq);
+    while(p != null){
+      const pe = events[p];
+      if(pe && visibleByType(pe.type)) break;
+      p = parentBySeq.get(p);
+    }
+    const rec = { ev: e, parent: (p == null ? null : p),
+                  children: [], x: 0, y: 0, w: 0, h: 0, depth: 0 };
+    nodes.set(e.seq, rec);
+    if(p == null) roots.push(e.seq);
+  }
+  // Wire children
+  for(const [seq, rec] of nodes){
+    if(rec.parent != null){
+      const pr = nodes.get(rec.parent);
+      if(pr) pr.children.push(seq);
+      else roots.push(seq);
+    }
+  }
+  // Depth = distance from root
+  function setDepth(seq, d){
+    const n = nodes.get(seq); if(!n) return;
+    n.depth = d;
+    for(const c of n.children) setDepth(c, d+1);
+  }
+  for(const r of roots) setDepth(r, 0);
+  return { nodes, roots };
+}
+
+// -------------------------- Layout --------------------------
+//
+// Tidy top-down layout. Each node has a fixed width; leaves consume one slot
+// horizontally, internal nodes are centred over their children's bounding box.
+// We compute one big virtual column index per leaf, then convert to pixels.
+
+const NODE_W = 138;
+const NODE_H = 34;
+const COL_W  = 168;          // horizontal step between sibling subtrees
+const ROW_H  = 64;           // vertical step between depths
+const PAD_X  = 40;
+const PAD_Y  = 40;
+
+function layout(g){
+  let nextCol = 0;
+  function place(seq){
+    const n = g.nodes.get(seq);
+    if(!n) return;
+    if(!n.children.length){
+      n.col = nextCol;
+      n.colStart = nextCol;
+      n.colEnd   = nextCol;
+      nextCol += 1;
+      return;
+    }
+    n.colStart = nextCol;
+    for(const c of n.children) place(c);
+    n.colEnd = nextCol - 1;
+    // centre parent above its kids
+    n.col = (n.colStart + n.colEnd) / 2;
+  }
+  // Stable order: place roots in seq order; children are already in insertion
+  // order which == seq order (we appended them while walking events linearly).
+  const sortedRoots = [...g.roots].sort((a,b) => a - b);
+  for(const r of sortedRoots) place(r);
+
+  // Convert column/depth to pixel coords
+  let maxX = 0, maxY = 0;
+  for(const [, n] of g.nodes){
+    n.x = PAD_X + n.col * COL_W + (COL_W - NODE_W) / 2;
+    n.y = PAD_Y + n.depth * ROW_H;
+    n.w = NODE_W;
+    n.h = NODE_H;
+    if(n.x + n.w > maxX) maxX = n.x + n.w;
+    if(n.y + n.h > maxY) maxY = n.y + n.h;
+  }
+  g.width  = Math.max(maxX + PAD_X, 600);
+  g.height = Math.max(maxY + PAD_Y, 400);
+}
+
+// -------------------------- Labels --------------------------
+
+function nodeLabel(e){
+  switch(e.type){
+    case 'call': {
+      const args = formatArgsShort(e.args);
+      return { title: e.func + '(', sub: args || '...' };
+    }
+    case 'return':
+      return { title: '← ' + retSnippet(e.value), sub: 'return' };
+    case 'branch':
+      return { title: e.node_id || 'branch', sub: e.taken != null ? 'taken: ' + e.taken : 'branch' };
+    case 'loop':
+      return { title: e.node_id || 'loop', sub: e.iteration != null ? 'iter ' + e.iteration : 'loop' };
+    case 'assign': {
+      const v = e.value && (e.value.redacted ? '***' : e.value.repr);
+      return { title: e.var + ' = ' + truncate(v || '?', 12), sub: 'line ' + e.line };
+    }
+    case 'extcall': {
+      let host = e.target || '';
+      try { host = new URL(e.target).host; } catch(_) {
+        host = host.replace(/^https?:\/\//,'').split('/')[0];
+      }
+      return { title: (e.verb || '?') + ' ' + host, sub: '→ ' + (e.status != null ? e.status : '…') };
+    }
+    case 'exception':
+      return { title: '⚠ ' + (e.exc_type || 'Exception'),
+               sub: truncate(e.message || ('line ' + e.line), 22) };
+    case 'line':
+      return { title: 'line ' + e.line, sub: e.func || '' };
+  }
+  return { title: e.type, sub: '' };
+}
+function formatArgsShort(args){
+  if(!args) return '';
+  const keys = Object.keys(args);
+  if(!keys.length) return ')';
+  const parts = keys.map(k => {
+    const v = args[k]; if(!v) return k;
+    return k + '=' + (v.redacted ? '***' : truncate(v.repr, 6));
+  });
+  return parts.join(', ') + ')';
+}
+function retSnippet(v){
+  if(!v) return '?';
+  if(v.redacted) return '***';
+  return truncate(v.repr, 14);
+}
+
+// -------------------------- Active state --------------------------
+
+// Active set = call frames currently open at `cur`, plus the current event.
+function activeAt(cur){
+  const open = new Set();
+  const last = Math.min(cur, events.length-1);
+  const stack = [];   // open call seqs
+  for(let i=0; i<=last; i++){
+    const e = events[i]; if(!e) continue;
+    if(e.type === 'call') stack.push(e.seq);
+    else if(e.type === 'return') stack.pop();
+  }
+  for(const s of stack) open.add(s);
+  return { open, currentSeq: events[cur] ? events[cur].seq : null };
+}
+
+// -------------------------- Rendering --------------------------
+
+function load(t){
+  if(!t || !Array.isArray(t.events)){
+    alert('That JSON does not look like a trace. Need an "events" array.');
+    return;
+  }
+  trace = t;
+  events = t.events;
+  lines = ((t.session && t.session.source) || '').replace(/\n$/,'').split('\n');
+  cur = 0;
+  selectedSeq = null;
+  firstRender = true;
+  rebuild();
+  document.getElementById('tot').textContent = Math.max(events.length-1, 0);
+  document.getElementById('scrub').max = Math.max(events.length-1, 0);
+  renderCode();
+  render();
+  renderDetails();
+}
+
+function rebuild(){
+  graph = buildEventTree(events);
+  layout(graph);
+}
+
+function renderCode(){
+  const el = document.getElementById('code');
+  el.innerHTML = lines.map((ln,i)=>(
+    '<div class="row" data-line="'+(i+1)+'"><span class="bar"></span>'+
+    '<span class="ln">'+(i+1)+'</span><span class="src">'+(esc(ln)||' ')+'</span></div>'
+  )).join('');
+}
+
+function statusText(){
+  if(!events.length) return ['', 'Load a trace.json to begin.'];
+  const e = events[cur]; if(!e) return ['', 'Ready.'];
+  switch(e.type){
+    case 'call':    return ['call',    `Call ${e.func}(…) at line ${e.line}`];
+    case 'return':  return ['return',  `Return from ${e.func || '?'} → ${retSnippet(e.value)}`];
+    case 'branch':  return ['branch',  `Branch ${e.node_id || ''} taken: ${e.taken}`];
+    case 'loop':    return ['loop',    `Loop ${e.node_id || ''} iteration ${e.iteration}`];
+    case 'assign':  return ['assign',  `${e.var} = ${e.value && (e.value.redacted?'***':e.value.repr)}`];
+    case 'extcall': return ['extcall', `External: ${e.verb} ${e.target} → ${e.status}`];
+    case 'exception': return ['exception',
+      `${e.exc_type || 'Exception'}${e.message ? ': ' + e.message : ''} (line ${e.line})`];
+    case 'line':    return ['line',    `line ${e.line} in ${e.func || ''}`];
+  }
+  return ['step', `Step ${cur}`];
+}
+
+function render(){
+  const { open, currentSeq } = activeAt(cur);
+
+  // status bar
+  const [tag, msg] = statusText();
+  document.getElementById('status').innerHTML =
+    '<span class="tag">'+esc(tag||'step')+'</span> '+esc(msg)+
+    '<span class="hint">click a node to inspect</span>';
+
+  // source-line highlight
+  document.querySelectorAll('.row.cur').forEach(r => r.classList.remove('cur'));
+  const curEv = events[cur];
+  if(curEv && curEv.line){
+    const r = document.querySelector('.row[data-line="'+curEv.line+'"]');
+    if(r){ r.classList.add('cur'); r.scrollIntoView({block:'nearest'}); }
+  }
+
+  // wipe canvas
+  const svgEl = document.getElementById('canvas');
+  while(svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
+
+  if(firstRender){ fitToGraph(); firstRender = false; }
+  else applyView();
+
+  if(!graph.nodes.size){
+    const g = svg('g', {transform:'translate(40,40)'}, svgEl);
+    svg('text', {x:0, y:0, class:'ev-sub'}, g).textContent =
+      events.length ? 'No visible events (try the filter chips above).' : 'No trace loaded.';
+    document.getElementById('cur').textContent = cur;
+    document.getElementById('scrub').value = cur;
+    return;
+  }
+
+  // Pass 1: edges
+  const gEdges = svg('g', {}, svgEl);
+  for(const [seq, n] of graph.nodes){
+    if(n.parent == null) continue;
+    const p = graph.nodes.get(n.parent); if(!p) continue;
+    drawEdge(gEdges, p, n, open.has(p.ev.seq) && seq <= cur, seq <= cur);
+  }
+
+  // Pass 2: nodes
+  for(const [seq, n] of graph.nodes){
+    drawNode(svgEl, seq, n, {
+      isCurrent: seq === currentSeq,
+      isPast:    seq <= cur,
+      isOpen:    open.has(seq),
+      isSelected: seq === selectedSeq,
+    });
+  }
+
+  // transport
+  document.getElementById('cur').textContent = cur;
+  document.getElementById('scrub').value = cur;
+}
+
+function drawEdge(parent, from, to, isActive, isPast){
+  // parent's bottom-centre → child's top-centre, with a soft S-curve.
+  const x1 = from.x + from.w/2;
+  const y1 = from.y + from.h;
+  const x2 = to.x   + to.w/2;
+  const y2 = to.y;
+  const my = (y1 + y2) / 2;
+  const d = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
+  const cls = 'ev-edge' + (isActive ? ' active' : (isPast ? ' past' : ''));
+  svg('path', { d, class: cls }, parent);
+}
+
+function drawNode(parent, seq, n, st){
+  const e = n.ev;
+  const cls = ['ev-node', e.type];
+  if(st.isCurrent)  cls.push('current');
+  if(st.isSelected) cls.push('selected');
+  if(!st.isPast && !st.isCurrent) cls.push('dimmed');
+  const g = svg('g', { transform:`translate(${n.x},${n.y})`, class: cls.join(' '),
+                       'data-seq': seq }, parent);
+  // background shape — branch/extcall get a rounder pill
+  const rx = (e.type === 'branch' || e.type === 'extcall') ? 16 : 8;
+  svg('rect', { x:0, y:0, width:n.w, height:n.h, rx, ry:rx, class:'bg' }, g);
+  // little type badge on the left edge
+  svg('rect', { x:0, y:0, width:5, height:n.h, rx, ry:rx, class:'bg',
+                style:'fill:currentColor; opacity:0.65; stroke:none' }, g);
+
+  const { title, sub } = nodeLabel(e);
+  svg('text', { x:11, y:14, class:'ev-label' }, g).textContent = truncate(title, 18);
+  svg('text', { x:11, y:27, class:'ev-sub'   }, g).textContent = truncate(sub,   22);
+
+  g.addEventListener('click', () => {
+    selectedSeq = (selectedSeq === seq) ? null : seq;
+    pause(); go(seq);
+  });
+}
+
+// -------------------------- Details panel --------------------------
+
+function renderDetails(){
+  const body = document.getElementById('details-body');
+  const closeBtn = document.getElementById('close-details');
+  // Prefer the explicitly-selected event; otherwise show the current event.
+  const showSeq = selectedSeq != null ? selectedSeq
+                 : (events[cur] ? events[cur].seq : null);
+  if(showSeq == null){
+    body.innerHTML = '<div class="empty">No event to inspect.</div>';
+    closeBtn.hidden = true;
+    return;
+  }
+  closeBtn.hidden = (selectedSeq == null);
+  const e = events[showSeq];
+  if(!e){ body.innerHTML = '<div class="empty">No data.</div>'; return; }
+
+  const title = ({
+    call:'function call', return:'function return',
+    branch:'branch decision', loop:'loop iteration',
+    assign:'variable change', extcall:'external call',
+    exception:'exception raised', line:'line executed',
+  })[e.type] || e.type;
+
+  let html = '';
+  html += '<h3>'+esc(title)+'</h3>';
+  html += '<div class="summary">seq <b>'+e.seq+'</b> · depth '+e.depth+' · ts '+e.ts+'</div>';
+
+  html += '<div class="section">';
+  html += '<div class="head"><span class="ttl">'+esc(e.type)+'</span>'+
+          '<button class="scrubto" data-seq="'+e.seq+'">scrub here</button></div>';
+  if(e.type === 'call'){
+    html += kvRow('func', esc(e.func));
+    html += kvRow('line', esc(e.line));
+    const ks = Object.keys(e.args || {});
+    if(ks.length){
+      for(const k of ks){
+        const v = e.args[k];
+        html += kvRow(esc(k), valueHtml(v));
+      }
+    } else html += kvRow('args', '<span class="v">(none)</span>', true);
+  } else if(e.type === 'return'){
+    html += kvRow('func', esc(e.func || '?'));
+    html += kvRow('line', esc(e.line));
+    html += kvRow('value', valueHtml(e.value));
+  } else if(e.type === 'branch'){
+    html += kvRow('node', esc(e.node_id || ''));
+    html += kvRow('line', esc(e.line));
+    html += kvRow('taken', '<span class="v accent">'+esc(e.taken)+'</span>', true);
+  } else if(e.type === 'loop'){
+    html += kvRow('node', esc(e.node_id || ''));
+    html += kvRow('line', esc(e.line));
+    html += kvRow('iter', '<span class="v accent">'+esc(e.iteration)+'</span>', true);
+  } else if(e.type === 'assign'){
+    html += kvRow('var', esc(e.var));
+    html += kvRow('scope', esc(e.scope || ''));
+    html += kvRow('line', esc(e.line));
+    html += kvRow('value', valueHtml(e.value));
+    if(e.prev) html += kvRow('was', valueHtml(e.prev));
+    if(e.change_index != null) html += kvRow('change #', String(e.change_index));
+  } else if(e.type === 'extcall'){
+    html += kvRow('verb', esc(e.verb));
+    html += kvRow('target', esc(e.target));
+    html += kvRow('status', '<span class="v '+(e.status===200?'accent':'amber')+'">'+esc(e.status)+'</span>', true);
+    if(e.duration_ms != null) html += kvRow('took', esc(e.duration_ms)+' ms');
+    html += kvRow('line', esc(e.line));
+  } else if(e.type === 'exception'){
+    html += kvRow('type',    '<span class="v" style="color:var(--exc);font-weight:600">'+esc(e.exc_type || '?')+'</span>', true);
+    html += kvRow('message', '<span class="v" style="color:var(--exc)">'+esc(e.message || '')+'</span>', true);
+    html += kvRow('func',    esc(e.func || '?'));
+    html += kvRow('line',    esc(e.line));
+    if(e.value) html += kvRow('value', valueHtml(e.value));
+  } else if(e.type === 'line'){
+    html += kvRow('func', esc(e.func || ''));
+    html += kvRow('line', esc(e.line));
+  }
+  if(e.parent_seq != null){
+    html += kvRow('parent', '<span class="v"><button class="scrubto" data-seq="'+e.parent_seq+'">seq '+e.parent_seq+'</button></span>', true);
+  }
+  html += '</div>';
+
+  body.innerHTML = html;
+  body.querySelectorAll('.scrubto').forEach(btn => {
+    btn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const s = +btn.dataset.seq; pause(); go(s);
+    });
+  });
+}
+
+function kvRow(k, vHtml, rawV){
+  if(rawV) return '<div class="kv"><span class="k">'+k+'</span>'+vHtml+'</div>';
+  return '<div class="kv"><span class="k">'+k+'</span><span class="v">'+vHtml+'</span></div>';
+}
+function valueHtml(v){
+  if(!v) return '<span class="v">?</span>';
+  if(v.redacted) return '<span class="v redacted">&lt;hidden&gt;</span>';
+  return '<span class="v">'+esc(v.repr)+'</span>';
+}
+
+document.getElementById('close-details').addEventListener('click', () => {
+  selectedSeq = null; renderDetails(); render();
+});
+
+// -------------------------- Transport --------------------------
+
+function go(i){
+  cur = Math.max(0, Math.min(events.length-1, i));
+  // If the current event is hidden by a filter, expose it so the user sees
+  // something change. (Rare — usually `line` is the only one filtered out.)
+  if(events[cur]){
+    const t = events[cur].type;
+    if((t === 'assign' && !filters.assign) || (t === 'line' && !filters.line)){
+      // leave filters as-is; the source highlight + status still update.
+    }
+  }
+  render(); renderDetails();
+}
+function step(d){ pause(); go(cur+d); }
+function play(){
+  if(timer) return pause();
+  if(cur >= events.length-1) cur = 0;
+  document.getElementById('play').innerHTML='&#10073;&#10073;';
+  const tick = () => {
+    if(cur >= events.length-1){ pause(); return; }
+    go(cur+1);
+    timer = setTimeout(tick, +document.getElementById('speed').value);
+  };
+  timer = setTimeout(tick, +document.getElementById('speed').value);
+}
+function pause(){ if(timer){ clearTimeout(timer); timer=null; } document.getElementById('play').innerHTML='&#9658;'; }
+
+document.getElementById('back').onclick = () => step(-1);
+document.getElementById('fwd').onclick  = () => step(1);
+document.getElementById('play').onclick = play;
+document.getElementById('scrub').oninput = e => { pause(); go(+e.target.value); };
+document.getElementById('cur').textContent = '0';
+document.getElementById('load').onclick = () => document.getElementById('file').click();
+document.getElementById('file').onchange = ev => {
+  const f = ev.target.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try { load(JSON.parse(rd.result)); }
+    catch(err){ alert('Could not parse trace: ' + err.message); }
+  };
+  rd.readAsText(f);
+};
+window.addEventListener('keydown', e => {
+  if(e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if(e.key === 'ArrowRight'){ step(1);  e.preventDefault(); }
+  else if(e.key === 'ArrowLeft'){ step(-1); e.preventDefault(); }
+  else if(e.key === ' '){ play(); e.preventDefault(); }
+  else if(e.key === 'Home'){ pause(); go(0); }
+  else if(e.key === 'End' ){ pause(); go(events.length-1); }
+});
+
+// Filter chips
+document.querySelectorAll('.legend .filter').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const t = chip.dataset.type;
+    filters[t] = !filters[t];
+    chip.classList.toggle('on', filters[t]);
+    chip.querySelector('input').checked = filters[t];
+    if(events.length){ firstRender = true; rebuild(); render(); }
+  });
+});
+
+// -------------------------- Zoom + pan --------------------------
+function wrapSize(){
+  const r = document.getElementById('canvas-wrap').getBoundingClientRect();
+  return { w: r.width, h: r.height };
+}
+function applyView(){
+  const {w, h} = wrapSize();
+  if(w === 0 || h === 0) return;
+  const vbW = w / zoomState.scale;
+  const vbH = h / zoomState.scale;
+  document.getElementById('canvas').setAttribute(
+    'viewBox', `${zoomState.panX} ${zoomState.panY} ${vbW} ${vbH}`
+  );
+  document.getElementById('zoom-level').textContent = Math.round(zoomState.scale * 100) + '%';
+}
+function fitToGraph(){
+  const {w, h} = wrapSize();
+  if(w === 0 || h === 0) return;
+  const pad = 30;
+  const sx = (w - 2*pad) / Math.max(graph.width,  1);
+  const sy = (h - 2*pad) / Math.max(graph.height, 1);
+  const s = Math.max(0.15, Math.min(2.5, Math.min(sx, sy)));
+  zoomState.scale = s;
+  zoomState.panX = -((w / s) - graph.width)  / 2;
+  zoomState.panY = -((h / s) - graph.height) / 2;
+  applyView();
+}
+function zoomTo(newScale, anchorX, anchorY){
+  const {w, h} = wrapSize();
+  if(w === 0 || h === 0) return;
+  const gx = zoomState.panX + (anchorX / w) * (w / zoomState.scale);
+  const gy = zoomState.panY + (anchorY / h) * (h / zoomState.scale);
+  zoomState.scale = Math.max(0.15, Math.min(4, newScale));
+  zoomState.panX = gx - (anchorX / w) * (w / zoomState.scale);
+  zoomState.panY = gy - (anchorY / h) * (h / zoomState.scale);
+  applyView();
+}
+
+(function setupZoom(){
+  const wrap  = document.getElementById('canvas-wrap');
+  const svgEl = document.getElementById('canvas');
+
+  wrap.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    const r = wrap.getBoundingClientRect();
+    const ax = ev.clientX - r.left;
+    const ay = ev.clientY - r.top;
+    const factor = ev.deltaY > 0 ? 0.9 : 1.1;
+    zoomTo(zoomState.scale * factor, ax, ay);
+  }, {passive: false});
+
+  let panning = null;
+  svgEl.addEventListener('mousedown', ev => {
+    if(ev.target.closest('g.ev-node')) return;
+    ev.preventDefault();
+    panning = { x: ev.clientX, y: ev.clientY,
+                panX: zoomState.panX, panY: zoomState.panY };
+    wrap.classList.add('panning');
+  });
+  document.addEventListener('mousemove', ev => {
+    if(!panning) return;
+    const dx = (ev.clientX - panning.x) / zoomState.scale;
+    const dy = (ev.clientY - panning.y) / zoomState.scale;
+    zoomState.panX = panning.panX - dx;
+    zoomState.panY = panning.panY - dy;
+    applyView();
+  });
+  document.addEventListener('mouseup', () => {
+    if(panning){ panning = null; wrap.classList.remove('panning'); }
+  });
+
+  document.getElementById('zoom-in').onclick  = () => {
+    const {w,h} = wrapSize(); zoomTo(zoomState.scale * 1.25, w/2, h/2);
+  };
+  document.getElementById('zoom-out').onclick = () => {
+    const {w,h} = wrapSize(); zoomTo(zoomState.scale / 1.25, w/2, h/2);
+  };
+  document.getElementById('zoom-fit').onclick = () => fitToGraph();
+
+  window.addEventListener('keydown', ev => {
+    if(ev.target.tagName === 'INPUT' || ev.target.tagName === 'SELECT') return;
+    if(ev.key === '+' || ev.key === '='){
+      const {w,h} = wrapSize(); zoomTo(zoomState.scale * 1.25, w/2, h/2);
+      ev.preventDefault();
+    } else if(ev.key === '-' || ev.key === '_'){
+      const {w,h} = wrapSize(); zoomTo(zoomState.scale / 1.25, w/2, h/2);
+      ev.preventDefault();
+    } else if(ev.key === '0'){ fitToGraph(); ev.preventDefault(); }
+  });
+
+  if(typeof ResizeObserver !== 'undefined'){
+    new ResizeObserver(() => applyView()).observe(wrap);
+  }
+})();
+
+// -------------------------- Column resizing --------------------------
+(function setupResizers(){
+  const main = document.querySelector('main');
+  try{
+    const saved = JSON.parse(localStorage.getItem('eg_cols') || '{}');
+    if(saved.src) main.style.setProperty('--col-src', saved.src + 'px');
+    if(saved.det) main.style.setProperty('--col-det', saved.det + 'px');
+  } catch(_){}
+  function px(name){ return parseInt(getComputedStyle(main).getPropertyValue(name)) || 0; }
+  document.querySelectorAll('.dragger').forEach(d => {
+    d.addEventListener('mousedown', ev => {
+      ev.preventDefault();
+      const side = d.dataset.side;
+      const startX = ev.clientX;
+      const startSrc = px('--col-src');
+      const startDet = px('--col-det');
+      d.classList.add('dragging');
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+      function onMove(mv){
+        const dx = mv.clientX - startX;
+        if(side === 'src'){
+          const w = Math.max(180, Math.min(720, startSrc + dx));
+          main.style.setProperty('--col-src', w + 'px');
+        } else {
+          const w = Math.max(220, Math.min(620, startDet - dx));
+          main.style.setProperty('--col-det', w + 'px');
+        }
+      }
+      function onUp(){
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        d.classList.remove('dragging');
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+        try{
+          localStorage.setItem('eg_cols', JSON.stringify({
+            src: px('--col-src'), det: px('--col-det')
+          }));
+        } catch(_){}
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+    d.addEventListener('dblclick', () => {
+      const main = document.querySelector('main');
+      if(d.dataset.side === 'src') main.style.removeProperty('--col-src');
+      else main.style.removeProperty('--col-det');
+      try{
+        localStorage.setItem('eg_cols', JSON.stringify({
+          src: px('--col-src'), det: px('--col-det')
+        }));
+      } catch(_){}
+    });
+  });
+})();
+
+render();
+
+// Auto-load via ?trace=<path> or ?id=<library-id>.
+(function autoload(){
+  const url = new URL(window.location.href);
+  const id = url.searchParams.get('id');
+  if(id){
+    fetch('/api/traces/' + encodeURIComponent(id))
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(load)
+      .catch(err => console.error('autoload by id failed', err));
+    return;
+  }
+  const tracePath = url.searchParams.get('trace');
+  if(!tracePath) return;
+  fetch(tracePath).then(r => r.json()).then(load).catch(err => {
+    console.error('autoload failed', err);
+  });
+})();
+
+// Records dropdown (library browser).
+(function setupRecords(){
+  const btn  = document.getElementById('records-btn');
+  const list = document.getElementById('records-list');
+  if(!btn || !list) return;
+  let records = [];
+  let activeId = new URL(location.href).searchParams.get('id') || null;
+
+  function escHtml(s){ return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;'); }
+  function shortPath(p){
+    if(!p) return '';
+    return p.length > 42 ? '…' + p.slice(-41) : p;
+  }
+  async function refresh(){
+    try{ const r = await fetch('/api/traces'); records = r.ok ? await r.json() : []; }
+    catch(e){ records = []; }
+    renderList();
+  }
+  function renderList(){
+    if(!records.length){
+      list.innerHTML = '<div class="records-empty">No saved records yet.<br>Run <code>tracesnap record &lt;file.py&gt;</code> to add one.</div>';
+      return;
+    }
+    list.innerHTML = records.map(r => {
+      const isActive = r.id === activeId;
+      return '<div class="record-row'+(isActive?' active':'')+'" data-id="'+escHtml(r.id)+'">' +
+        '<div class="info">' +
+          '<div class="record-name" data-id="'+escHtml(r.id)+'" contenteditable="true" spellcheck="false">'+escHtml(r.name)+'</div>' +
+          '<div class="record-meta">'+escHtml(r.created)+' · '+r.event_count+' events · '+escHtml(r.kind)+(r.source?' · '+escHtml(shortPath(r.source)):'')+'</div>' +
+        '</div>' +
+        '<button class="record-del" data-id="'+escHtml(r.id)+'" title="Delete">&times;</button>' +
+      '</div>';
+    }).join('') +
+    '<div class="records-hint">click a row to load · click the name to rename</div>';
+  }
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    list.classList.toggle('open');
+    if(list.classList.contains('open')) refresh();
+  });
+  document.addEventListener('click', e => {
+    if(!list.contains(e.target) && e.target !== btn) list.classList.remove('open');
+  });
+  list.addEventListener('click', async e => {
+    const del = e.target.closest('.record-del');
+    if(del){
+      e.stopPropagation();
+      if(!confirm('Delete this record? This cannot be undone.')) return;
+      await fetch('/api/traces/' + encodeURIComponent(del.dataset.id), {method:'DELETE'});
+      refresh();
+      return;
+    }
+    if(e.target.closest('.record-name')) return;
+    const row = e.target.closest('.record-row'); if(!row) return;
+    const id = row.dataset.id; activeId = id;
+    try{
+      const r = await fetch('/api/traces/' + encodeURIComponent(id));
+      if(r.ok){
+        const trace = await r.json();
+        load(trace);
+        try{ history.replaceState(null, '', '?id=' + encodeURIComponent(id)); }catch(_){}
+      }
+    } catch(_){}
+    list.classList.remove('open');
+    renderList();
+  });
+  list.addEventListener('blur', async e => {
+    const nm = e.target.closest && e.target.closest('.record-name');
+    if(!nm) return;
+    const id = nm.dataset.id;
+    const newName = (nm.textContent || '').trim();
+    if(!newName) return;
+    const curMeta = records.find(r => r.id === id);
+    if(curMeta && curMeta.name === newName) return;
+    try{
+      await fetch('/api/traces/' + encodeURIComponent(id), {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name: newName})
+      });
+      refresh();
+    } catch(_){}
+  }, true);
+  list.addEventListener('keydown', e => {
+    if(e.target.classList && e.target.classList.contains('record-name') && e.key === 'Enter'){
+      e.preventDefault(); e.target.blur();
+    }
+  });
+})();
+</script>
+</body>
+</html>
