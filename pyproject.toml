@@ -36,8 +36,10 @@ dev = ["pytest>=7", "ruff", "build", "twine", "flask>=2.0", "django>=4.0", "fast
 tracesnap = "tracesnap.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourname/tracesnap"
-Issues = "https://github.com/yourname/tracesnap/issues"
+Homepage = "https://github.com/bangi98/mindplayer"
+Repository = "https://github.com/bangi98/mindplayer"
+Issues = "https://github.com/bangi98/mindplayer/issues"
+Changelog = "https://github.com/bangi98/mindplayer/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tracesnap"]
