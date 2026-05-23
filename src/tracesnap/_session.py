@@ -111,6 +111,7 @@ class _Session:
             "granularity": "line",
             "entry": f"{primary}:<module>" if primary else "",
             "source": self.sources.get(primary, "") if primary else "",
+            "sources_by_file": dict(self.sources),
             "redaction": {"key_rules": sorted(self.redact)},
             "structure_by_file": {p: s["nodes"] for p, s in self.structures_by_file.items()},
         }

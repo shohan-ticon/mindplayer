@@ -1,0 +1,2930 @@
+{
+  "version": "0.1",
+  "trace_id": "trace",
+  "structure_ref": "structure.json",
+  "session": {
+    "kind": "script",
+    "granularity": "line",
+    "entry": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py:<module>",
+    "source": "\"\"\"\nmain_calc.py - entrypoint for the calculator demo.\n\nEach operation lives in its own file in this directory:\n  add_op.py       -> Add\n  subtract_op.py  -> Subtract\n  multiply_op.py  -> Multiply\n  divide_op.py    -> Divide\n\nRun:   tracesnap record examples/calculator/main_calc.py --out trace.json\nOpen:  tracesnap view trace.json\n\nNote: tracesnap traces only the entrypoint file, so the Add/Subtract/\nMultiply/Divide methods will NOT appear in the trace -- you'll only see\nMain.run, Main.take_input, and the calls into the imported classes\n(as call sites, not as traced frames).\n\"\"\"\nimport os\nimport sys\n\n# Make the sibling modules importable when this file is run via\n# `tracesnap record examples/calculator/main_calc.py` from the repo root.\nsys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))\n\nfrom add_op import Add\nfrom subtract_op import Subtract\nfrom multiply_op import Multiply\nfrom divide_op import Divide\n\n\nclass Main:\n    def __init__(self):\n        self.a = None\n        self.b = None\n\n    def take_input(self):\n        self.a = int(input(\"Enter first number: \"))\n        self.b = int(input(\"Enter second number: \"))\n\n    def do_add(self):\n        op = Add(self.a, self.b)\n        return op.compute()\n\n    def do_subtract(self):\n        op = Subtract(self.a, self.b)\n        return op.compute()\n\n    def do_multiply(self):\n        op = Multiply(self.a, self.b)\n        return op.compute()\n\n    def do_divide(self):\n        op = Divide(self.a, self.b)\n        try:\n            return op.compute()\n        except ZeroDivisionError as exc:\n            return f\"ERROR: {exc}\"\n\n    def run(self):\n        self.take_input()\n        results = {\n            \"add\":      self.do_add(),\n            \"subtract\": self.do_subtract(),\n            \"multiply\": self.do_multiply(),\n            \"divide\":   self.do_divide(),\n        }\n        for name, value in results.items():\n            print(f\"{name:<9}= {value}\")\n        return results\n\n\nresult = Main().run()\n",
+    "sources_by_file": {
+      "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py": "\"\"\"\nmain_calc.py - entrypoint for the calculator demo.\n\nEach operation lives in its own file in this directory:\n  add_op.py       -> Add\n  subtract_op.py  -> Subtract\n  multiply_op.py  -> Multiply\n  divide_op.py    -> Divide\n\nRun:   tracesnap record examples/calculator/main_calc.py --out trace.json\nOpen:  tracesnap view trace.json\n\nNote: tracesnap traces only the entrypoint file, so the Add/Subtract/\nMultiply/Divide methods will NOT appear in the trace -- you'll only see\nMain.run, Main.take_input, and the calls into the imported classes\n(as call sites, not as traced frames).\n\"\"\"\nimport os\nimport sys\n\n# Make the sibling modules importable when this file is run via\n# `tracesnap record examples/calculator/main_calc.py` from the repo root.\nsys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))\n\nfrom add_op import Add\nfrom subtract_op import Subtract\nfrom multiply_op import Multiply\nfrom divide_op import Divide\n\n\nclass Main:\n    def __init__(self):\n        self.a = None\n        self.b = None\n\n    def take_input(self):\n        self.a = int(input(\"Enter first number: \"))\n        self.b = int(input(\"Enter second number: \"))\n\n    def do_add(self):\n        op = Add(self.a, self.b)\n        return op.compute()\n\n    def do_subtract(self):\n        op = Subtract(self.a, self.b)\n        return op.compute()\n\n    def do_multiply(self):\n        op = Multiply(self.a, self.b)\n        return op.compute()\n\n    def do_divide(self):\n        op = Divide(self.a, self.b)\n        try:\n            return op.compute()\n        except ZeroDivisionError as exc:\n            return f\"ERROR: {exc}\"\n\n    def run(self):\n        self.take_input()\n        results = {\n            \"add\":      self.do_add(),\n            \"subtract\": self.do_subtract(),\n            \"multiply\": self.do_multiply(),\n            \"divide\":   self.do_divide(),\n        }\n        for name, value in results.items():\n            print(f\"{name:<9}= {value}\")\n        return results\n\n\nresult = Main().run()\n",
+      "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py": "class Add:\n    def __init__(self, a, b):\n        self.a = a\n        self.b = b\n\n    def compute(self):\n        result = self.a + self.b\n        return result\n",
+      "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py": "class Subtract:\n    def __init__(self, a, b):\n        self.a = a\n        self.b = b\n\n    def compute(self):\n        result = self.a - self.b\n        return result\n",
+      "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py": "class Multiply:\n    def __init__(self, a, b):\n        self.a = a\n        self.b = b\n\n    def compute(self):\n        result = self.a * self.b\n        return result\n",
+      "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py": "class Divide:\n    def __init__(self, a, b):\n        self.a = a\n        self.b = b\n\n    def compute(self):\n        if self.b == 0:\n            raise ZeroDivisionError(\"cannot divide by zero\")\n        result = self.a / self.b\n        return result\n"
+    },
+    "redaction": {
+      "key_rules": [
+        "api_key",
+        "authorization",
+        "password",
+        "secret",
+        "token"
+      ]
+    },
+    "structure_by_file": {
+      "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py": [
+        {
+          "id": "s1",
+          "kind": "statement",
+          "subkind": "Expr",
+          "lineno": 1,
+          "end_lineno": 17,
+          "parent": null
+        },
+        {
+          "id": "s18",
+          "kind": "statement",
+          "subkind": "Import",
+          "lineno": 18,
+          "end_lineno": 18,
+          "parent": null
+        },
+        {
+          "id": "s19",
+          "kind": "statement",
+          "subkind": "Import",
+          "lineno": 19,
+          "end_lineno": 19,
+          "parent": null
+        },
+        {
+          "id": "s23",
+          "kind": "statement",
+          "subkind": "Expr",
+          "lineno": 23,
+          "end_lineno": 23,
+          "parent": null
+        },
+        {
+          "id": "s25",
+          "kind": "statement",
+          "subkind": "ImportFrom",
+          "lineno": 25,
+          "end_lineno": 25,
+          "parent": null
+        },
+        {
+          "id": "s26",
+          "kind": "statement",
+          "subkind": "ImportFrom",
+          "lineno": 26,
+          "end_lineno": 26,
+          "parent": null
+        },
+        {
+          "id": "s27",
+          "kind": "statement",
+          "subkind": "ImportFrom",
+          "lineno": 27,
+          "end_lineno": 27,
+          "parent": null
+        },
+        {
+          "id": "s28",
+          "kind": "statement",
+          "subkind": "ImportFrom",
+          "lineno": 28,
+          "end_lineno": 28,
+          "parent": null
+        },
+        {
+          "id": "s31",
+          "kind": "statement",
+          "subkind": "ClassDef",
+          "lineno": 31,
+          "end_lineno": 69,
+          "parent": null
+        },
+        {
+          "id": "__init__",
+          "kind": "function",
+          "name": "__init__",
+          "lineno": 32,
+          "end_lineno": 34,
+          "parent": null,
+          "params": [
+            "self"
+          ]
+        },
+        {
+          "id": "__init__.s33",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 33,
+          "end_lineno": 33,
+          "parent": "__init__"
+        },
+        {
+          "id": "__init__.s34",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 34,
+          "end_lineno": 34,
+          "parent": "__init__"
+        },
+        {
+          "id": "take_input",
+          "kind": "function",
+          "name": "take_input",
+          "lineno": 36,
+          "end_lineno": 38,
+          "parent": null,
+          "params": [
+            "self"
+          ]
+        },
+        {
+          "id": "take_input.s37",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 37,
+          "end_lineno": 37,
+          "parent": "take_input"
+        },
+        {
+          "id": "take_input.s38",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 38,
+          "end_lineno": 38,
+          "parent": "take_input"
+        },
+        {
+          "id": "do_add",
+          "kind": "function",
+          "name": "do_add",
+          "lineno": 40,
+          "end_lineno": 42,
+          "parent": null,
+          "params": [
+            "self"
+          ]
+        },
+        {
+          "id": "do_add.s41",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 41,
+          "end_lineno": 41,
+          "parent": "do_add"
+        },
+        {
+          "id": "do_add.s42",
+          "kind": "statement",
+          "subkind": "Return",
+          "lineno": 42,
+          "end_lineno": 42,
+          "parent": "do_add"
+        },
+        {
+          "id": "do_subtract",
+          "kind": "function",
+          "name": "do_subtract",
+          "lineno": 44,
+          "end_lineno": 46,
+          "parent": null,
+          "params": [
+            "self"
+          ]
+        },
+        {
+          "id": "do_subtract.s45",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 45,
+          "end_lineno": 45,
+          "parent": "do_subtract"
+        },
+        {
+          "id": "do_subtract.s46",
+          "kind": "statement",
+          "subkind": "Return",
+          "lineno": 46,
+          "end_lineno": 46,
+          "parent": "do_subtract"
+        },
+        {
+          "id": "do_multiply",
+          "kind": "function",
+          "name": "do_multiply",
+          "lineno": 48,
+          "end_lineno": 50,
+          "parent": null,
+          "params": [
+            "self"
+          ]
+        },
+        {
+          "id": "do_multiply.s49",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 49,
+          "end_lineno": 49,
+          "parent": "do_multiply"
+        },
+        {
+          "id": "do_multiply.s50",
+          "kind": "statement",
+          "subkind": "Return",
+          "lineno": 50,
+          "end_lineno": 50,
+          "parent": "do_multiply"
+        },
+        {
+          "id": "do_divide",
+          "kind": "function",
+          "name": "do_divide",
+          "lineno": 52,
+          "end_lineno": 57,
+          "parent": null,
+          "params": [
+            "self"
+          ]
+        },
+        {
+          "id": "do_divide.s53",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 53,
+          "end_lineno": 53,
+          "parent": "do_divide"
+        },
+        {
+          "id": "do_divide.s54",
+          "kind": "statement",
+          "subkind": "Try",
+          "lineno": 54,
+          "end_lineno": 57,
+          "parent": "do_divide"
+        },
+        {
+          "id": "do_divide.s55",
+          "kind": "statement",
+          "subkind": "Return",
+          "lineno": 55,
+          "end_lineno": 55,
+          "parent": "do_divide"
+        },
+        {
+          "id": "run",
+          "kind": "function",
+          "name": "run",
+          "lineno": 59,
+          "end_lineno": 69,
+          "parent": null,
+          "params": [
+            "self"
+          ]
+        },
+        {
+          "id": "run.s60",
+          "kind": "statement",
+          "subkind": "Expr",
+          "lineno": 60,
+          "end_lineno": 60,
+          "parent": "run"
+        },
+        {
+          "id": "run.s61",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 61,
+          "end_lineno": 66,
+          "parent": "run"
+        },
+        {
+          "id": "run.for67",
+          "kind": "loop",
+          "subkind": "for",
+          "lineno": 67,
+          "end_lineno": 68,
+          "parent": "run"
+        },
+        {
+          "id": "run.for67.s68",
+          "kind": "statement",
+          "subkind": "Expr",
+          "lineno": 68,
+          "end_lineno": 68,
+          "parent": "run.for67"
+        },
+        {
+          "id": "run.s69",
+          "kind": "statement",
+          "subkind": "Return",
+          "lineno": 69,
+          "end_lineno": 69,
+          "parent": "run"
+        },
+        {
+          "id": "s72",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 72,
+          "end_lineno": 72,
+          "parent": null
+        }
+      ],
+      "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py": [
+        {
+          "id": "s1",
+          "kind": "statement",
+          "subkind": "ClassDef",
+          "lineno": 1,
+          "end_lineno": 8,
+          "parent": null
+        },
+        {
+          "id": "__init__",
+          "kind": "function",
+          "name": "__init__",
+          "lineno": 2,
+          "end_lineno": 4,
+          "parent": null,
+          "params": [
+            "self",
+            "a",
+            "b"
+          ]
+        },
+        {
+          "id": "__init__.s3",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 3,
+          "end_lineno": 3,
+          "parent": "__init__"
+        },
+        {
+          "id": "__init__.s4",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 4,
+          "end_lineno": 4,
+          "parent": "__init__"
+        },
+        {
+          "id": "compute",
+          "kind": "function",
+          "name": "compute",
+          "lineno": 6,
+          "end_lineno": 8,
+          "parent": null,
+          "params": [
+            "self"
+          ]
+        },
+        {
+          "id": "compute.s7",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 7,
+          "end_lineno": 7,
+          "parent": "compute"
+        },
+        {
+          "id": "compute.s8",
+          "kind": "statement",
+          "subkind": "Return",
+          "lineno": 8,
+          "end_lineno": 8,
+          "parent": "compute"
+        }
+      ],
+      "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py": [
+        {
+          "id": "s1",
+          "kind": "statement",
+          "subkind": "ClassDef",
+          "lineno": 1,
+          "end_lineno": 8,
+          "parent": null
+        },
+        {
+          "id": "__init__",
+          "kind": "function",
+          "name": "__init__",
+          "lineno": 2,
+          "end_lineno": 4,
+          "parent": null,
+          "params": [
+            "self",
+            "a",
+            "b"
+          ]
+        },
+        {
+          "id": "__init__.s3",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 3,
+          "end_lineno": 3,
+          "parent": "__init__"
+        },
+        {
+          "id": "__init__.s4",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 4,
+          "end_lineno": 4,
+          "parent": "__init__"
+        },
+        {
+          "id": "compute",
+          "kind": "function",
+          "name": "compute",
+          "lineno": 6,
+          "end_lineno": 8,
+          "parent": null,
+          "params": [
+            "self"
+          ]
+        },
+        {
+          "id": "compute.s7",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 7,
+          "end_lineno": 7,
+          "parent": "compute"
+        },
+        {
+          "id": "compute.s8",
+          "kind": "statement",
+          "subkind": "Return",
+          "lineno": 8,
+          "end_lineno": 8,
+          "parent": "compute"
+        }
+      ],
+      "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py": [
+        {
+          "id": "s1",
+          "kind": "statement",
+          "subkind": "ClassDef",
+          "lineno": 1,
+          "end_lineno": 8,
+          "parent": null
+        },
+        {
+          "id": "__init__",
+          "kind": "function",
+          "name": "__init__",
+          "lineno": 2,
+          "end_lineno": 4,
+          "parent": null,
+          "params": [
+            "self",
+            "a",
+            "b"
+          ]
+        },
+        {
+          "id": "__init__.s3",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 3,
+          "end_lineno": 3,
+          "parent": "__init__"
+        },
+        {
+          "id": "__init__.s4",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 4,
+          "end_lineno": 4,
+          "parent": "__init__"
+        },
+        {
+          "id": "compute",
+          "kind": "function",
+          "name": "compute",
+          "lineno": 6,
+          "end_lineno": 8,
+          "parent": null,
+          "params": [
+            "self"
+          ]
+        },
+        {
+          "id": "compute.s7",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 7,
+          "end_lineno": 7,
+          "parent": "compute"
+        },
+        {
+          "id": "compute.s8",
+          "kind": "statement",
+          "subkind": "Return",
+          "lineno": 8,
+          "end_lineno": 8,
+          "parent": "compute"
+        }
+      ],
+      "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py": [
+        {
+          "id": "s1",
+          "kind": "statement",
+          "subkind": "ClassDef",
+          "lineno": 1,
+          "end_lineno": 10,
+          "parent": null
+        },
+        {
+          "id": "__init__",
+          "kind": "function",
+          "name": "__init__",
+          "lineno": 2,
+          "end_lineno": 4,
+          "parent": null,
+          "params": [
+            "self",
+            "a",
+            "b"
+          ]
+        },
+        {
+          "id": "__init__.s3",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 3,
+          "end_lineno": 3,
+          "parent": "__init__"
+        },
+        {
+          "id": "__init__.s4",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 4,
+          "end_lineno": 4,
+          "parent": "__init__"
+        },
+        {
+          "id": "compute",
+          "kind": "function",
+          "name": "compute",
+          "lineno": 6,
+          "end_lineno": 10,
+          "parent": null,
+          "params": [
+            "self"
+          ]
+        },
+        {
+          "id": "compute.if7",
+          "kind": "branch",
+          "subkind": "if",
+          "lineno": 7,
+          "end_lineno": 8,
+          "parent": "compute"
+        },
+        {
+          "id": "compute.if7.s8",
+          "kind": "statement",
+          "subkind": "Raise",
+          "lineno": 8,
+          "end_lineno": 8,
+          "parent": "compute.if7"
+        },
+        {
+          "id": "compute.s9",
+          "kind": "statement",
+          "subkind": "Assign",
+          "lineno": 9,
+          "end_lineno": 9,
+          "parent": "compute"
+        },
+        {
+          "id": "compute.s10",
+          "kind": "statement",
+          "subkind": "Return",
+          "lineno": 10,
+          "end_lineno": 10,
+          "parent": "compute"
+        }
+      ]
+    }
+  },
+  "events": [
+    {
+      "seq": 0,
+      "ts": 118545600,
+      "depth": 1,
+      "type": "call",
+      "func": "Add",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "args": {},
+      "parent_seq": null
+    },
+    {
+      "seq": 1,
+      "ts": 118557300,
+      "depth": 1,
+      "type": "line",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "func": "Add",
+      "parent_seq": null
+    },
+    {
+      "seq": 2,
+      "ts": 118575700,
+      "depth": 1,
+      "type": "assign",
+      "var": "__module__",
+      "scope": "local",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "value": {
+        "repr": "'add_op'",
+        "type": "str",
+        "id": 1836262335728,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 3,
+      "ts": 118579700,
+      "depth": 1,
+      "type": "assign",
+      "var": "__qualname__",
+      "scope": "local",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "value": {
+        "repr": "'Add'",
+        "type": "str",
+        "id": 1836247906224,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 4,
+      "ts": 118591600,
+      "depth": 1,
+      "type": "line",
+      "line": 2,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "func": "Add",
+      "parent_seq": null
+    },
+    {
+      "seq": 5,
+      "ts": 118604000,
+      "depth": 1,
+      "type": "assign",
+      "var": "__init__",
+      "scope": "local",
+      "line": 2,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "value": {
+        "repr": "<function Add.__init__ at 0x000001AB89C6CD30>",
+        "type": "function",
+        "id": 1836262542640,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 6,
+      "ts": 118606300,
+      "depth": 1,
+      "type": "line",
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "func": "Add",
+      "parent_seq": null
+    },
+    {
+      "seq": 7,
+      "ts": 118613700,
+      "depth": 1,
+      "type": "assign",
+      "var": "compute",
+      "scope": "local",
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "value": {
+        "repr": "<function Add.compute at 0x000001AB89C6CDC0>",
+        "type": "function",
+        "id": 1836262542784,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 8,
+      "ts": 118620900,
+      "depth": 1,
+      "type": "return",
+      "value": {
+        "repr": "None",
+        "type": "NoneType",
+        "id": 140719167057112,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "func": "Add",
+      "parent_seq": null
+    },
+    {
+      "seq": 9,
+      "ts": 126062200,
+      "depth": 1,
+      "type": "call",
+      "func": "Subtract",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "args": {},
+      "parent_seq": null
+    },
+    {
+      "seq": 10,
+      "ts": 126071800,
+      "depth": 1,
+      "type": "line",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "func": "Subtract",
+      "parent_seq": null
+    },
+    {
+      "seq": 11,
+      "ts": 126086900,
+      "depth": 1,
+      "type": "assign",
+      "var": "__module__",
+      "scope": "local",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "value": {
+        "repr": "'subtract_op'",
+        "type": "str",
+        "id": 1836262385136,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 12,
+      "ts": 126099800,
+      "depth": 1,
+      "type": "assign",
+      "var": "__qualname__",
+      "scope": "local",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "value": {
+        "repr": "'Subtract'",
+        "type": "str",
+        "id": 1836262465264,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 13,
+      "ts": 126102900,
+      "depth": 1,
+      "type": "line",
+      "line": 2,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "func": "Subtract",
+      "parent_seq": null
+    },
+    {
+      "seq": 14,
+      "ts": 126114800,
+      "depth": 1,
+      "type": "assign",
+      "var": "__init__",
+      "scope": "local",
+      "line": 2,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "value": {
+        "repr": "<function Subtract.__init__ at 0x000001AB89C6CEE0>",
+        "type": "function",
+        "id": 1836262543072,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 15,
+      "ts": 126119400,
+      "depth": 1,
+      "type": "line",
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "func": "Subtract",
+      "parent_seq": null
+    },
+    {
+      "seq": 16,
+      "ts": 126126900,
+      "depth": 1,
+      "type": "assign",
+      "var": "compute",
+      "scope": "local",
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "value": {
+        "repr": "<function Subtract.compute at 0x000001AB89C6CF70>",
+        "type": "function",
+        "id": 1836262543216,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 17,
+      "ts": 126132100,
+      "depth": 1,
+      "type": "return",
+      "value": {
+        "repr": "None",
+        "type": "NoneType",
+        "id": 140719167057112,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "func": "Subtract",
+      "parent_seq": null
+    },
+    {
+      "seq": 18,
+      "ts": 133412500,
+      "depth": 1,
+      "type": "call",
+      "func": "Multiply",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "args": {},
+      "parent_seq": null
+    },
+    {
+      "seq": 19,
+      "ts": 133425400,
+      "depth": 1,
+      "type": "line",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "func": "Multiply",
+      "parent_seq": null
+    },
+    {
+      "seq": 20,
+      "ts": 133446400,
+      "depth": 1,
+      "type": "assign",
+      "var": "__module__",
+      "scope": "local",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "value": {
+        "repr": "'multiply_op'",
+        "type": "str",
+        "id": 1836262465008,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 21,
+      "ts": 133452500,
+      "depth": 1,
+      "type": "assign",
+      "var": "__qualname__",
+      "scope": "local",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "value": {
+        "repr": "'Multiply'",
+        "type": "str",
+        "id": 1836262465200,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 22,
+      "ts": 133455900,
+      "depth": 1,
+      "type": "line",
+      "line": 2,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "func": "Multiply",
+      "parent_seq": null
+    },
+    {
+      "seq": 23,
+      "ts": 133471400,
+      "depth": 1,
+      "type": "assign",
+      "var": "__init__",
+      "scope": "local",
+      "line": 2,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "value": {
+        "repr": "<function Multiply.__init__ at 0x000001AB89CA80D0>",
+        "type": "function",
+        "id": 1836262785232,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 24,
+      "ts": 133474900,
+      "depth": 1,
+      "type": "line",
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "func": "Multiply",
+      "parent_seq": null
+    },
+    {
+      "seq": 25,
+      "ts": 133485100,
+      "depth": 1,
+      "type": "assign",
+      "var": "compute",
+      "scope": "local",
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "value": {
+        "repr": "<function Multiply.compute at 0x000001AB89CA8160>",
+        "type": "function",
+        "id": 1836262785376,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 26,
+      "ts": 133492300,
+      "depth": 1,
+      "type": "return",
+      "value": {
+        "repr": "None",
+        "type": "NoneType",
+        "id": 140719167057112,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "func": "Multiply",
+      "parent_seq": null
+    },
+    {
+      "seq": 27,
+      "ts": 143711800,
+      "depth": 1,
+      "type": "call",
+      "func": "Divide",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "args": {},
+      "parent_seq": null
+    },
+    {
+      "seq": 28,
+      "ts": 143722400,
+      "depth": 1,
+      "type": "line",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "func": "Divide",
+      "parent_seq": null
+    },
+    {
+      "seq": 29,
+      "ts": 143739100,
+      "depth": 1,
+      "type": "assign",
+      "var": "__module__",
+      "scope": "local",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "value": {
+        "repr": "'divide_op'",
+        "type": "str",
+        "id": 1836262497776,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 30,
+      "ts": 143743900,
+      "depth": 1,
+      "type": "assign",
+      "var": "__qualname__",
+      "scope": "local",
+      "line": 1,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "value": {
+        "repr": "'Divide'",
+        "type": "str",
+        "id": 1836262538544,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 31,
+      "ts": 143747500,
+      "depth": 1,
+      "type": "line",
+      "line": 2,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "func": "Divide",
+      "parent_seq": null
+    },
+    {
+      "seq": 32,
+      "ts": 143760000,
+      "depth": 1,
+      "type": "assign",
+      "var": "__init__",
+      "scope": "local",
+      "line": 2,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "value": {
+        "repr": "<function Divide.__init__ at 0x000001AB89CA81F0>",
+        "type": "function",
+        "id": 1836262785520,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 33,
+      "ts": 143763200,
+      "depth": 1,
+      "type": "line",
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "func": "Divide",
+      "parent_seq": null
+    },
+    {
+      "seq": 34,
+      "ts": 143770700,
+      "depth": 1,
+      "type": "assign",
+      "var": "compute",
+      "scope": "local",
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "value": {
+        "repr": "<function Divide.compute at 0x000001AB89CA8280>",
+        "type": "function",
+        "id": 1836262785664,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 35,
+      "ts": 143776000,
+      "depth": 1,
+      "type": "return",
+      "value": {
+        "repr": "None",
+        "type": "NoneType",
+        "id": 140719167057112,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "func": "Divide",
+      "parent_seq": null
+    },
+    {
+      "seq": 36,
+      "ts": 143861200,
+      "depth": 1,
+      "type": "call",
+      "func": "Main",
+      "line": 31,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "args": {},
+      "parent_seq": null
+    },
+    {
+      "seq": 37,
+      "ts": 143865300,
+      "depth": 1,
+      "type": "line",
+      "line": 31,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "Main",
+      "parent_seq": null
+    },
+    {
+      "seq": 38,
+      "ts": 143870800,
+      "depth": 1,
+      "type": "assign",
+      "var": "__module__",
+      "scope": "local",
+      "line": 31,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "'__traced__'",
+        "type": "str",
+        "id": 1836248990832,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 39,
+      "ts": 143873900,
+      "depth": 1,
+      "type": "assign",
+      "var": "__qualname__",
+      "scope": "local",
+      "line": 31,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "'Main'",
+        "type": "str",
+        "id": 1836262538480,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 40,
+      "ts": 143876000,
+      "depth": 1,
+      "type": "line",
+      "line": 32,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "Main",
+      "parent_seq": null
+    },
+    {
+      "seq": 41,
+      "ts": 143882700,
+      "depth": 1,
+      "type": "assign",
+      "var": "__init__",
+      "scope": "local",
+      "line": 32,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "<function Main.__init__ at 0x000001AB89CA8040>",
+        "type": "function",
+        "id": 1836262785088,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 42,
+      "ts": 143884900,
+      "depth": 1,
+      "type": "line",
+      "line": 36,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "Main",
+      "parent_seq": null
+    },
+    {
+      "seq": 43,
+      "ts": 143891100,
+      "depth": 1,
+      "type": "assign",
+      "var": "take_input",
+      "scope": "local",
+      "line": 36,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "<function Main.take_input at 0x000001AB89CA8310>",
+        "type": "function",
+        "id": 1836262785808,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 44,
+      "ts": 143893300,
+      "depth": 1,
+      "type": "line",
+      "line": 40,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "Main",
+      "parent_seq": null
+    },
+    {
+      "seq": 45,
+      "ts": 143899700,
+      "depth": 1,
+      "type": "assign",
+      "var": "do_add",
+      "scope": "local",
+      "line": 40,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "<function Main.do_add at 0x000001AB89CA83A0>",
+        "type": "function",
+        "id": 1836262785952,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 46,
+      "ts": 143901800,
+      "depth": 1,
+      "type": "line",
+      "line": 44,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "Main",
+      "parent_seq": null
+    },
+    {
+      "seq": 47,
+      "ts": 143909100,
+      "depth": 1,
+      "type": "assign",
+      "var": "do_subtract",
+      "scope": "local",
+      "line": 44,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "<function Main.do_subtract at 0x000001AB89CA8430>",
+        "type": "function",
+        "id": 1836262786096,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 48,
+      "ts": 143911500,
+      "depth": 1,
+      "type": "line",
+      "line": 48,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "Main",
+      "parent_seq": null
+    },
+    {
+      "seq": 49,
+      "ts": 143919100,
+      "depth": 1,
+      "type": "assign",
+      "var": "do_multiply",
+      "scope": "local",
+      "line": 48,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "<function Main.do_multiply at 0x000001AB89CA84C0>",
+        "type": "function",
+        "id": 1836262786240,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 50,
+      "ts": 143921300,
+      "depth": 1,
+      "type": "line",
+      "line": 52,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "Main",
+      "parent_seq": null
+    },
+    {
+      "seq": 51,
+      "ts": 143929200,
+      "depth": 1,
+      "type": "assign",
+      "var": "do_divide",
+      "scope": "local",
+      "line": 52,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "<function Main.do_divide at 0x000001AB89CA8550>",
+        "type": "function",
+        "id": 1836262786384,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 52,
+      "ts": 143931400,
+      "depth": 1,
+      "type": "line",
+      "line": 59,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "Main",
+      "parent_seq": null
+    },
+    {
+      "seq": 53,
+      "ts": 143939800,
+      "depth": 1,
+      "type": "assign",
+      "var": "run",
+      "scope": "local",
+      "line": 59,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "<function Main.run at 0x000001AB89CA85E0>",
+        "type": "function",
+        "id": 1836262786528,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 54,
+      "ts": 143943400,
+      "depth": 1,
+      "type": "return",
+      "value": {
+        "repr": "None",
+        "type": "NoneType",
+        "id": 140719167057112,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 59,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "Main",
+      "parent_seq": null
+    },
+    {
+      "seq": 55,
+      "ts": 143964000,
+      "depth": 1,
+      "type": "call",
+      "func": "__init__",
+      "line": 32,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "args": {
+        "self": {
+          "repr": "<__traced__.Main object at 0x000001AB89CA6040>",
+          "type": "Main",
+          "id": 1836262776896,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 56,
+      "ts": 143968200,
+      "depth": 1,
+      "type": "line",
+      "line": 33,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 57,
+      "ts": 143972400,
+      "depth": 1,
+      "type": "line",
+      "line": 34,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 58,
+      "ts": 143977500,
+      "depth": 1,
+      "type": "return",
+      "value": {
+        "repr": "None",
+        "type": "NoneType",
+        "id": 140719167057112,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 34,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 59,
+      "ts": 143986100,
+      "depth": 1,
+      "type": "call",
+      "func": "run",
+      "line": 59,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "args": {
+        "self": {
+          "repr": "<__traced__.Main object at 0x000001AB89CA6040>",
+          "type": "Main",
+          "id": 1836262776896,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 60,
+      "ts": 143990200,
+      "depth": 1,
+      "type": "line",
+      "line": 60,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": null
+    },
+    {
+      "seq": 61,
+      "ts": 143996000,
+      "depth": 2,
+      "type": "call",
+      "func": "take_input",
+      "line": 36,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "args": {
+        "self": {
+          "repr": "<__traced__.Main object at 0x000001AB89CA6040>",
+          "type": "Main",
+          "id": 1836262776896,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 62,
+      "ts": 144000100,
+      "depth": 2,
+      "type": "line",
+      "line": 37,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "take_input",
+      "parent_seq": null
+    },
+    {
+      "seq": 63,
+      "ts": 144062500,
+      "depth": 2,
+      "type": "line",
+      "line": 38,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "take_input",
+      "parent_seq": null
+    },
+    {
+      "seq": 64,
+      "ts": 144074100,
+      "depth": 2,
+      "type": "return",
+      "value": {
+        "repr": "None",
+        "type": "NoneType",
+        "id": 140719167057112,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 38,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "take_input",
+      "parent_seq": null
+    },
+    {
+      "seq": 65,
+      "ts": 144089700,
+      "depth": 1,
+      "type": "line",
+      "line": 62,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": null
+    },
+    {
+      "seq": 66,
+      "ts": 144096900,
+      "depth": 2,
+      "type": "call",
+      "func": "do_add",
+      "line": 40,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "args": {
+        "self": {
+          "repr": "<__traced__.Main object at 0x000001AB89CA6040>",
+          "type": "Main",
+          "id": 1836262776896,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 67,
+      "ts": 144100700,
+      "depth": 2,
+      "type": "line",
+      "line": 41,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "do_add",
+      "parent_seq": null
+    },
+    {
+      "seq": 68,
+      "ts": 144113600,
+      "depth": 3,
+      "type": "call",
+      "func": "__init__",
+      "line": 2,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "args": {
+        "self": {
+          "repr": "<add_op.Add object at 0x000001AB89CA60A0>",
+          "type": "Add",
+          "id": 1836262776992,
+          "truncated": false,
+          "redacted": false
+        },
+        "a": {
+          "repr": "5",
+          "type": "int",
+          "id": 1836242659760,
+          "truncated": false,
+          "redacted": false
+        },
+        "b": {
+          "repr": "3",
+          "type": "int",
+          "id": 1836242659696,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 69,
+      "ts": 144119100,
+      "depth": 3,
+      "type": "line",
+      "line": 3,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 70,
+      "ts": 144124500,
+      "depth": 3,
+      "type": "line",
+      "line": 4,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 71,
+      "ts": 144130500,
+      "depth": 3,
+      "type": "return",
+      "value": {
+        "repr": "None",
+        "type": "NoneType",
+        "id": 140719167057112,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 4,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 72,
+      "ts": 144136800,
+      "depth": 2,
+      "type": "assign",
+      "var": "op",
+      "scope": "local",
+      "line": 41,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "<add_op.Add object at 0x000001AB89CA60A0>",
+        "type": "Add",
+        "id": 1836262776992,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 73,
+      "ts": 144138800,
+      "depth": 2,
+      "type": "line",
+      "line": 42,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "do_add",
+      "parent_seq": null
+    },
+    {
+      "seq": 74,
+      "ts": 144145000,
+      "depth": 3,
+      "type": "call",
+      "func": "compute",
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "args": {
+        "self": {
+          "repr": "<add_op.Add object at 0x000001AB89CA60A0>",
+          "type": "Add",
+          "id": 1836262776992,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 75,
+      "ts": 144148900,
+      "depth": 3,
+      "type": "line",
+      "line": 7,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "func": "compute",
+      "parent_seq": null
+    },
+    {
+      "seq": 76,
+      "ts": 144153900,
+      "depth": 3,
+      "type": "assign",
+      "var": "result",
+      "scope": "local",
+      "line": 7,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "value": {
+        "repr": "8",
+        "type": "int",
+        "id": 1836242659856,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 77,
+      "ts": 144157500,
+      "depth": 3,
+      "type": "line",
+      "line": 8,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "func": "compute",
+      "parent_seq": null
+    },
+    {
+      "seq": 78,
+      "ts": 144162700,
+      "depth": 3,
+      "type": "return",
+      "value": {
+        "repr": "8",
+        "type": "int",
+        "id": 1836242659856,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 8,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\add_op.py",
+      "func": "compute",
+      "parent_seq": null
+    },
+    {
+      "seq": 79,
+      "ts": 144168600,
+      "depth": 2,
+      "type": "return",
+      "value": {
+        "repr": "8",
+        "type": "int",
+        "id": 1836242659856,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 42,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "do_add",
+      "parent_seq": null
+    },
+    {
+      "seq": 80,
+      "ts": 144173200,
+      "depth": 1,
+      "type": "line",
+      "line": 63,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": null
+    },
+    {
+      "seq": 81,
+      "ts": 144179400,
+      "depth": 2,
+      "type": "call",
+      "func": "do_subtract",
+      "line": 44,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "args": {
+        "self": {
+          "repr": "<__traced__.Main object at 0x000001AB89CA6040>",
+          "type": "Main",
+          "id": 1836262776896,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 82,
+      "ts": 144183200,
+      "depth": 2,
+      "type": "line",
+      "line": 45,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "do_subtract",
+      "parent_seq": null
+    },
+    {
+      "seq": 83,
+      "ts": 144193800,
+      "depth": 3,
+      "type": "call",
+      "func": "__init__",
+      "line": 2,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "args": {
+        "self": {
+          "repr": "<subtract_op.Subtract object at 0x000001AB89CA60A0>",
+          "type": "Subtract",
+          "id": 1836262776992,
+          "truncated": false,
+          "redacted": false
+        },
+        "a": {
+          "repr": "5",
+          "type": "int",
+          "id": 1836242659760,
+          "truncated": false,
+          "redacted": false
+        },
+        "b": {
+          "repr": "3",
+          "type": "int",
+          "id": 1836242659696,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 84,
+      "ts": 144199100,
+      "depth": 3,
+      "type": "line",
+      "line": 3,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 85,
+      "ts": 144204900,
+      "depth": 3,
+      "type": "line",
+      "line": 4,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 86,
+      "ts": 144210900,
+      "depth": 3,
+      "type": "return",
+      "value": {
+        "repr": "None",
+        "type": "NoneType",
+        "id": 140719167057112,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 4,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 87,
+      "ts": 144216900,
+      "depth": 2,
+      "type": "assign",
+      "var": "op",
+      "scope": "local",
+      "line": 45,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "<subtract_op.Subtract object at 0x000001AB89CA60A0>",
+        "type": "Subtract",
+        "id": 1836262776992,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 88,
+      "ts": 144218800,
+      "depth": 2,
+      "type": "line",
+      "line": 46,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "do_subtract",
+      "parent_seq": null
+    },
+    {
+      "seq": 89,
+      "ts": 144225100,
+      "depth": 3,
+      "type": "call",
+      "func": "compute",
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "args": {
+        "self": {
+          "repr": "<subtract_op.Subtract object at 0x000001AB89CA60A0>",
+          "type": "Subtract",
+          "id": 1836262776992,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 90,
+      "ts": 144229200,
+      "depth": 3,
+      "type": "line",
+      "line": 7,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "func": "compute",
+      "parent_seq": null
+    },
+    {
+      "seq": 91,
+      "ts": 144234200,
+      "depth": 3,
+      "type": "assign",
+      "var": "result",
+      "scope": "local",
+      "line": 7,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "value": {
+        "repr": "2",
+        "type": "int",
+        "id": 1836242659664,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 92,
+      "ts": 144236400,
+      "depth": 3,
+      "type": "line",
+      "line": 8,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "func": "compute",
+      "parent_seq": null
+    },
+    {
+      "seq": 93,
+      "ts": 144243000,
+      "depth": 3,
+      "type": "return",
+      "value": {
+        "repr": "2",
+        "type": "int",
+        "id": 1836242659664,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 8,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\subtract_op.py",
+      "func": "compute",
+      "parent_seq": null
+    },
+    {
+      "seq": 94,
+      "ts": 144248700,
+      "depth": 2,
+      "type": "return",
+      "value": {
+        "repr": "2",
+        "type": "int",
+        "id": 1836242659664,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 46,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "do_subtract",
+      "parent_seq": null
+    },
+    {
+      "seq": 95,
+      "ts": 144253100,
+      "depth": 1,
+      "type": "line",
+      "line": 64,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": null
+    },
+    {
+      "seq": 96,
+      "ts": 144259600,
+      "depth": 2,
+      "type": "call",
+      "func": "do_multiply",
+      "line": 48,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "args": {
+        "self": {
+          "repr": "<__traced__.Main object at 0x000001AB89CA6040>",
+          "type": "Main",
+          "id": 1836262776896,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 97,
+      "ts": 144263100,
+      "depth": 2,
+      "type": "line",
+      "line": 49,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "do_multiply",
+      "parent_seq": null
+    },
+    {
+      "seq": 98,
+      "ts": 144273500,
+      "depth": 3,
+      "type": "call",
+      "func": "__init__",
+      "line": 2,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "args": {
+        "self": {
+          "repr": "<multiply_op.Multiply object at 0x000001AB89CA60A0>",
+          "type": "Multiply",
+          "id": 1836262776992,
+          "truncated": false,
+          "redacted": false
+        },
+        "a": {
+          "repr": "5",
+          "type": "int",
+          "id": 1836242659760,
+          "truncated": false,
+          "redacted": false
+        },
+        "b": {
+          "repr": "3",
+          "type": "int",
+          "id": 1836242659696,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 99,
+      "ts": 144278700,
+      "depth": 3,
+      "type": "line",
+      "line": 3,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 100,
+      "ts": 144283700,
+      "depth": 3,
+      "type": "line",
+      "line": 4,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 101,
+      "ts": 144289600,
+      "depth": 3,
+      "type": "return",
+      "value": {
+        "repr": "None",
+        "type": "NoneType",
+        "id": 140719167057112,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 4,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 102,
+      "ts": 144295400,
+      "depth": 2,
+      "type": "assign",
+      "var": "op",
+      "scope": "local",
+      "line": 49,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "<multiply_op.Multiply object at 0x000001AB89CA60A0>",
+        "type": "Multiply",
+        "id": 1836262776992,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 103,
+      "ts": 144297300,
+      "depth": 2,
+      "type": "line",
+      "line": 50,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "do_multiply",
+      "parent_seq": null
+    },
+    {
+      "seq": 104,
+      "ts": 144303400,
+      "depth": 3,
+      "type": "call",
+      "func": "compute",
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "args": {
+        "self": {
+          "repr": "<multiply_op.Multiply object at 0x000001AB89CA60A0>",
+          "type": "Multiply",
+          "id": 1836262776992,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 105,
+      "ts": 144307000,
+      "depth": 3,
+      "type": "line",
+      "line": 7,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "func": "compute",
+      "parent_seq": null
+    },
+    {
+      "seq": 106,
+      "ts": 144311800,
+      "depth": 3,
+      "type": "assign",
+      "var": "result",
+      "scope": "local",
+      "line": 7,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "value": {
+        "repr": "15",
+        "type": "int",
+        "id": 1836242660080,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 107,
+      "ts": 144313900,
+      "depth": 3,
+      "type": "line",
+      "line": 8,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "func": "compute",
+      "parent_seq": null
+    },
+    {
+      "seq": 108,
+      "ts": 144319000,
+      "depth": 3,
+      "type": "return",
+      "value": {
+        "repr": "15",
+        "type": "int",
+        "id": 1836242660080,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 8,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\multiply_op.py",
+      "func": "compute",
+      "parent_seq": null
+    },
+    {
+      "seq": 109,
+      "ts": 144326000,
+      "depth": 2,
+      "type": "return",
+      "value": {
+        "repr": "15",
+        "type": "int",
+        "id": 1836242660080,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 50,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "do_multiply",
+      "parent_seq": null
+    },
+    {
+      "seq": 110,
+      "ts": 144330400,
+      "depth": 1,
+      "type": "line",
+      "line": 65,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": null
+    },
+    {
+      "seq": 111,
+      "ts": 144336900,
+      "depth": 2,
+      "type": "call",
+      "func": "do_divide",
+      "line": 52,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "args": {
+        "self": {
+          "repr": "<__traced__.Main object at 0x000001AB89CA6040>",
+          "type": "Main",
+          "id": 1836262776896,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 112,
+      "ts": 144340700,
+      "depth": 2,
+      "type": "line",
+      "line": 53,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "do_divide",
+      "parent_seq": null
+    },
+    {
+      "seq": 113,
+      "ts": 144349300,
+      "depth": 3,
+      "type": "call",
+      "func": "__init__",
+      "line": 2,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "args": {
+        "self": {
+          "repr": "<divide_op.Divide object at 0x000001AB89CA60A0>",
+          "type": "Divide",
+          "id": 1836262776992,
+          "truncated": false,
+          "redacted": false
+        },
+        "a": {
+          "repr": "5",
+          "type": "int",
+          "id": 1836242659760,
+          "truncated": false,
+          "redacted": false
+        },
+        "b": {
+          "repr": "3",
+          "type": "int",
+          "id": 1836242659696,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 114,
+      "ts": 144354000,
+      "depth": 3,
+      "type": "line",
+      "line": 3,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 115,
+      "ts": 144358700,
+      "depth": 3,
+      "type": "line",
+      "line": 4,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 116,
+      "ts": 144364600,
+      "depth": 3,
+      "type": "return",
+      "value": {
+        "repr": "None",
+        "type": "NoneType",
+        "id": 140719167057112,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 4,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "func": "__init__",
+      "parent_seq": null
+    },
+    {
+      "seq": 117,
+      "ts": 144374300,
+      "depth": 2,
+      "type": "assign",
+      "var": "op",
+      "scope": "local",
+      "line": 53,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "<divide_op.Divide object at 0x000001AB89CA60A0>",
+        "type": "Divide",
+        "id": 1836262776992,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 118,
+      "ts": 144376200,
+      "depth": 2,
+      "type": "line",
+      "line": 54,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "do_divide",
+      "parent_seq": null
+    },
+    {
+      "seq": 119,
+      "ts": 144380200,
+      "depth": 2,
+      "type": "line",
+      "line": 55,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "do_divide",
+      "parent_seq": null
+    },
+    {
+      "seq": 120,
+      "ts": 144386100,
+      "depth": 3,
+      "type": "call",
+      "func": "compute",
+      "line": 6,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "args": {
+        "self": {
+          "repr": "<divide_op.Divide object at 0x000001AB89CA60A0>",
+          "type": "Divide",
+          "id": 1836262776992,
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      "parent_seq": null
+    },
+    {
+      "seq": 121,
+      "ts": 144389800,
+      "depth": 3,
+      "type": "line",
+      "line": 7,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "func": "compute",
+      "parent_seq": null
+    },
+    {
+      "seq": 122,
+      "ts": 144393500,
+      "depth": 3,
+      "type": "line",
+      "line": 9,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "func": "compute",
+      "parent_seq": null
+    },
+    {
+      "seq": 123,
+      "ts": 144403700,
+      "depth": 3,
+      "type": "assign",
+      "var": "result",
+      "scope": "local",
+      "line": 9,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "value": {
+        "repr": "1.6666666666666667",
+        "type": "float",
+        "id": 1836259840752,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 124,
+      "ts": 144409200,
+      "depth": 3,
+      "type": "line",
+      "line": 10,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "func": "compute",
+      "parent_seq": null
+    },
+    {
+      "seq": 125,
+      "ts": 144415400,
+      "depth": 3,
+      "type": "return",
+      "value": {
+        "repr": "1.6666666666666667",
+        "type": "float",
+        "id": 1836259840752,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 10,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\divide_op.py",
+      "func": "compute",
+      "parent_seq": null
+    },
+    {
+      "seq": 126,
+      "ts": 144422000,
+      "depth": 2,
+      "type": "return",
+      "value": {
+        "repr": "1.6666666666666667",
+        "type": "float",
+        "id": 1836259840752,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 55,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "do_divide",
+      "parent_seq": null
+    },
+    {
+      "seq": 127,
+      "ts": 144426600,
+      "depth": 1,
+      "type": "line",
+      "line": 61,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": null
+    },
+    {
+      "seq": 128,
+      "ts": 144436900,
+      "depth": 1,
+      "type": "assign",
+      "var": "results",
+      "scope": "local",
+      "line": 61,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "{'add': 8, 'subtract': 2, 'multiply': 15, 'divide': 1.6666666666666667}",
+        "type": "dict",
+        "id": 1836262841408,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 129,
+      "ts": 144440400,
+      "depth": 1,
+      "type": "line",
+      "line": 67,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": null
+    },
+    {
+      "seq": 130,
+      "ts": 144446400,
+      "depth": 1,
+      "type": "assign",
+      "var": "name",
+      "scope": "local",
+      "line": 67,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "'add'",
+        "type": "str",
+        "id": 1836242737200,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 131,
+      "ts": 144449600,
+      "depth": 1,
+      "type": "assign",
+      "var": "value",
+      "scope": "local",
+      "line": 67,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "8",
+        "type": "int",
+        "id": 1836242659856,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": null,
+      "change_index": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 132,
+      "ts": 144454300,
+      "depth": 1,
+      "type": "loop",
+      "node_id": "run.for67",
+      "line": 68,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "iteration": 0,
+      "parent_seq": null
+    },
+    {
+      "seq": 133,
+      "ts": 144456900,
+      "depth": 1,
+      "type": "line",
+      "line": 68,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": 132
+    },
+    {
+      "seq": 134,
+      "ts": 144480100,
+      "depth": 1,
+      "type": "line",
+      "line": 67,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": null
+    },
+    {
+      "seq": 135,
+      "ts": 144487500,
+      "depth": 1,
+      "type": "assign",
+      "var": "name",
+      "scope": "local",
+      "line": 67,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "'subtract'",
+        "type": "str",
+        "id": 1836245538864,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": {
+        "repr": "'add'",
+        "type": "str",
+        "id": 1836242737200,
+        "truncated": false,
+        "redacted": false
+      },
+      "change_index": 1,
+      "parent_seq": null
+    },
+    {
+      "seq": 136,
+      "ts": 144491900,
+      "depth": 1,
+      "type": "assign",
+      "var": "value",
+      "scope": "local",
+      "line": 67,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "2",
+        "type": "int",
+        "id": 1836242659664,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": {
+        "repr": "8",
+        "type": "int",
+        "id": 1836242659856,
+        "truncated": false,
+        "redacted": false
+      },
+      "change_index": 1,
+      "parent_seq": null
+    },
+    {
+      "seq": 137,
+      "ts": 144494800,
+      "depth": 1,
+      "type": "loop",
+      "node_id": "run.for67",
+      "line": 68,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "iteration": 1,
+      "parent_seq": null
+    },
+    {
+      "seq": 138,
+      "ts": 144496800,
+      "depth": 1,
+      "type": "line",
+      "line": 68,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": 137
+    },
+    {
+      "seq": 139,
+      "ts": 144506100,
+      "depth": 1,
+      "type": "line",
+      "line": 67,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": null
+    },
+    {
+      "seq": 140,
+      "ts": 144512800,
+      "depth": 1,
+      "type": "assign",
+      "var": "name",
+      "scope": "local",
+      "line": 67,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "'multiply'",
+        "type": "str",
+        "id": 1836262743984,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": {
+        "repr": "'subtract'",
+        "type": "str",
+        "id": 1836245538864,
+        "truncated": false,
+        "redacted": false
+      },
+      "change_index": 2,
+      "parent_seq": null
+    },
+    {
+      "seq": 141,
+      "ts": 144519500,
+      "depth": 1,
+      "type": "assign",
+      "var": "value",
+      "scope": "local",
+      "line": 67,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "15",
+        "type": "int",
+        "id": 1836242660080,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": {
+        "repr": "2",
+        "type": "int",
+        "id": 1836242659664,
+        "truncated": false,
+        "redacted": false
+      },
+      "change_index": 2,
+      "parent_seq": null
+    },
+    {
+      "seq": 142,
+      "ts": 144522200,
+      "depth": 1,
+      "type": "loop",
+      "node_id": "run.for67",
+      "line": 68,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "iteration": 2,
+      "parent_seq": null
+    },
+    {
+      "seq": 143,
+      "ts": 144524000,
+      "depth": 1,
+      "type": "line",
+      "line": 68,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": 142
+    },
+    {
+      "seq": 144,
+      "ts": 144532700,
+      "depth": 1,
+      "type": "line",
+      "line": 67,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": null
+    },
+    {
+      "seq": 145,
+      "ts": 144538800,
+      "depth": 1,
+      "type": "assign",
+      "var": "name",
+      "scope": "local",
+      "line": 67,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "'divide'",
+        "type": "str",
+        "id": 1836252896688,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": {
+        "repr": "'multiply'",
+        "type": "str",
+        "id": 1836262743984,
+        "truncated": false,
+        "redacted": false
+      },
+      "change_index": 3,
+      "parent_seq": null
+    },
+    {
+      "seq": 146,
+      "ts": 144545900,
+      "depth": 1,
+      "type": "assign",
+      "var": "value",
+      "scope": "local",
+      "line": 67,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "value": {
+        "repr": "1.6666666666666667",
+        "type": "float",
+        "id": 1836259840752,
+        "truncated": false,
+        "redacted": false
+      },
+      "prev": {
+        "repr": "15",
+        "type": "int",
+        "id": 1836242660080,
+        "truncated": false,
+        "redacted": false
+      },
+      "change_index": 3,
+      "parent_seq": null
+    },
+    {
+      "seq": 147,
+      "ts": 144548700,
+      "depth": 1,
+      "type": "loop",
+      "node_id": "run.for67",
+      "line": 68,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "iteration": 3,
+      "parent_seq": null
+    },
+    {
+      "seq": 148,
+      "ts": 144550600,
+      "depth": 1,
+      "type": "line",
+      "line": 68,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": 147
+    },
+    {
+      "seq": 149,
+      "ts": 144562700,
+      "depth": 1,
+      "type": "line",
+      "line": 67,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": null
+    },
+    {
+      "seq": 150,
+      "ts": 144567800,
+      "depth": 1,
+      "type": "line",
+      "line": 69,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": null
+    },
+    {
+      "seq": 151,
+      "ts": 144581800,
+      "depth": 1,
+      "type": "return",
+      "value": {
+        "repr": "{'add': 8, 'subtract': 2, 'multiply': 15, 'divide': 1.6666666666666667}",
+        "type": "dict",
+        "id": 1836262841408,
+        "truncated": false,
+        "redacted": false
+      },
+      "line": 69,
+      "file": "E:\\personal\\mindplayer\\examples\\calculator\\main_calc.py",
+      "func": "run",
+      "parent_seq": null
+    }
+  ]
+}

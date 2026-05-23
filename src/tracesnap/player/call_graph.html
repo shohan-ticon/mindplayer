@@ -113,6 +113,26 @@ main{
 .panel .cap{ font:600 11.5px "Hanken Grotesk",sans-serif; letter-spacing:.1em;
   text-transform:uppercase; color:var(--accent); padding:13px 16px 8px;
   border-bottom:1px solid var(--faint); background:var(--inset); flex:none }
+.panel.source .cap{ display:flex; align-items:center; gap:10px }
+.panel.source .cap .file-label{ margin-left:auto; font:500 11px "JetBrains Mono",monospace;
+  color:var(--ink-2); text-transform:none; letter-spacing:0 }
+.panel.source .cap .file-label.swapped{ color:var(--accent) }
+.panel.source .cap .file-label.pinned::before{ content:"📌 "; font-size:10px }
+.file-tabs{ display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+  padding:7px 12px; border-bottom:1px solid var(--faint);
+  background:var(--card); flex:none }
+.file-tabs:empty{ display:none }
+.file-tab{ font:500 11.5px "JetBrains Mono",monospace; color:var(--ink-2);
+  background:var(--inset); border:1px solid var(--faint); border-radius:7px;
+  padding:3px 9px; cursor:pointer; user-select:none;
+  transition:border-color .15s, color .15s, background .15s }
+.file-tab:hover{ border-color:var(--accent-line); color:var(--ink) }
+.file-tab.active{ background:var(--accent-soft); color:var(--accent);
+  border-color:var(--accent-line); font-weight:600 }
+.file-tab.pinned::after{ content:" 📌"; font-size:10px }
+.file-tabs.playing .file-tab{ opacity:.45; cursor:default; pointer-events:none }
+.file-tabs .hint{ font:500 10.5px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  margin-left:auto; letter-spacing:.04em; text-transform:uppercase; opacity:.7 }
 
 /* source code panel (left) */
 .panel.source{ overflow:hidden }
@@ -264,6 +284,7 @@ footer{ position:sticky; bottom:0; background:var(--card);
 <header>
   <h1>Call Graph</h1>
   <span class="sub">who calls whom &middot; click a node for details</span>
+  <a class="loadbtn" href="home.html">&larr; TraceSnap</a>
   <a class="loadbtn" href="player.html">&uarr; Text view</a>
   <a class="loadbtn" href="simulator.html">&uarr; Flowchart view</a>
   <a class="loadbtn" href="event_graph.html">&uarr; Event graph</a>
@@ -274,6 +295,23 @@ footer{ position:sticky; bottom:0; background:var(--card);
     <button class="loadbtn" id="records-btn">Records &#x25BE;</button>
     <div class="records-list" id="records-list"></div>
   </div>
+  <div class="records-menu">
+    <button class="loadbtn" id="dl-btn" title="Export the current diagram">Download &#x25BE;</button>
+    <div class="records-list" id="dl-menu">
+      <div class="record-row" data-fmt="svg">
+        <div class="info">
+          <div class="record-name">Download SVG</div>
+          <div class="record-meta">vector &middot; scalable &middot; embed in PRs</div>
+        </div>
+      </div>
+      <div class="record-row" data-fmt="png">
+        <div class="info">
+          <div class="record-name">Download PNG</div>
+          <div class="record-meta">raster &middot; 2&times; HiDPI &middot; ready for Slack</div>
+        </div>
+      </div>
+    </div>
+  </div>
   <button class="loadbtn" id="load">Load trace.json</button>
   <input type="file" id="file" accept=".json" hidden>
   <span class="kbd"><b>&larr;</b><b>&rarr;</b> step <b>space</b> play</span>
@@ -281,7 +319,8 @@ footer{ position:sticky; bottom:0; background:var(--card);
 
 <main>
   <section class="panel source">
-    <div class="cap">Source</div>
+    <div class="cap">Source<span class="file-label" id="file-label" title=""></span></div>
+    <div class="file-tabs" id="file-tabs"></div>
     <div id="code"></div>
   </section>
   <div class="dragger" data-side="src" title="Drag to resize"></div>
@@ -342,7 +381,65 @@ function svg(tag, attrs, parent){
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function truncate(s, n){ s = String(s||''); return s.length > n ? s.slice(0, n-1) + '…' : s; }
 
-let trace = null, events = [], lines = [], cur = 0, timer = null;
+let trace = null, events = [], cur = 0, timer = null;
+let linesByFile = {}, primaryFile = null, currentFile = null;
+let userPinnedFile = null;   // when set, overrides auto-follow
+
+function fileBasename(p){
+  if(!p) return '';
+  const s = String(p).replace(/\\/g, '/');
+  const i = s.lastIndexOf('/');
+  return i >= 0 ? s.slice(i+1) : s;
+}
+
+function renderFileTabs(){
+  const wrap = document.getElementById('file-tabs');
+  if(!wrap) return;
+  const paths = Object.keys(linesByFile);
+  if(paths.length <= 1){ wrap.innerHTML = ''; return; }
+  const ordered = [primaryFile].concat(
+    paths.filter(p => p !== primaryFile).sort((a,b) =>
+      fileBasename(a).localeCompare(fileBasename(b))));
+  wrap.innerHTML = ordered.map(p =>
+    '<span class="file-tab" data-path="'+esc(p)+'" title="'+esc(p)+'">'+
+    esc(fileBasename(p))+'</span>').join('') +
+    '<span class="hint">click to pin · click again to follow</span>';
+  wrap.querySelectorAll('.file-tab').forEach(t => {
+    t.addEventListener('click', () => {
+      if(timer) return;
+      const p = t.dataset.path;
+      if(userPinnedFile === p){
+        userPinnedFile = null;
+      } else {
+        userPinnedFile = p;
+        cur = jumpToLastEventInFile(p, cur);
+        document.getElementById('cur').textContent = cur;
+        document.getElementById('scrub').value = cur;
+      }
+      render();
+    });
+  });
+}
+
+function jumpToLastEventInFile(file, fromCur){
+  const last = Math.min(fromCur, events.length-1);
+  for(let i = last; i >= 0; i--){
+    if(events[i] && events[i].file === file) return i;
+  }
+  for(let i = last+1; i < events.length; i++){
+    if(events[i] && events[i].file === file) return i;
+  }
+  return fromCur;
+}
+
+function updateFileTabsHighlight(){
+  const wrap = document.getElementById('file-tabs');
+  if(wrap) wrap.classList.toggle('playing', !!timer);
+  document.querySelectorAll('#file-tabs .file-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.path === currentFile);
+    t.classList.toggle('pinned', userPinnedFile === t.dataset.path);
+  });
+}
 let graph = {nodes: new Map(), edges: new Map(), entry: null};
 let positions = new Map();
 let selectedFunc = null;
@@ -358,39 +455,60 @@ let exceptionSeqs = [];
 //   nodes: func -> { name, kind: 'function'|'extcall', invocations: [...] }
 //   edges: 'caller>callee' -> { from, to, kind, calls: [...] }
 // Each invocation records seq, callSeq, args, returnSeq, returnValue, locals.
+// Node identity = file + '::' + func so different files' same-named functions
+// (e.g. Add.compute vs Subtract.compute) get distinct nodes.
+function nodeIdOf(file, func){
+  return file ? (file + '::' + func) : func;
+}
+function fileStem(p){
+  const b = fileBasename(p);
+  return b.endsWith('.py') ? b.slice(0, -3) : b;
+}
+// Display name for a node: bare `func` for single-file traces or unknown file,
+// `stem.func` when multiple files exist so the user can tell collisions apart.
+function nodeDisplayName(node){
+  if(node.kind === 'entry') return node.id;
+  if(node.kind === 'extcall') return node.func;
+  const fileCount = Object.keys(linesByFile).length;
+  if(fileCount <= 1 || !node.file) return node.func;
+  return fileStem(node.file) + '.' + node.func;
+}
+
 function buildCallGraph(events){
   const nodes = new Map();
   const edges = new Map();
   const ROOT = '<entry>';   // synthetic script-level caller (parent of all top-level calls)
   let hasAnyCall = false;
-  const stack = [];   // [{func, invocation}]
+  const stack = [];   // [{nodeId, file, func, invocation}]
 
-  function getNode(name, kind){
-    if(!nodes.has(name)) nodes.set(name, {name, kind, invocations: []});
-    return nodes.get(name);
+  function getNode(id, kind, file, func){
+    if(!nodes.has(id)) nodes.set(id, {id, kind, file: file||null, func: func||id, invocations: []});
+    return nodes.get(id);
   }
-  function getEdge(from, to, kind){
-    const key = from + '>' + to;
-    if(!edges.has(key)) edges.set(key, {from, to, kind, calls: []});
+  function getEdge(fromId, toId, kind){
+    const key = fromId + '>' + toId;
+    if(!edges.has(key)) edges.set(key, {from: fromId, to: toId, kind, calls: []});
     return edges.get(key);
   }
 
   for(const e of events){
     if(e.type === 'call'){
+      const callerId = stack.length ? stack[stack.length-1].nodeId : ROOT;
       const callerFunc = stack.length ? stack[stack.length-1].func : ROOT;
-      if(callerFunc === ROOT) getNode(ROOT, 'entry');
+      if(callerId === ROOT) getNode(ROOT, 'entry', null, ROOT);
       hasAnyCall = true;
-      const node = getNode(e.func, 'function');
+      const calleeId = nodeIdOf(e.file, e.func);
+      const node = getNode(calleeId, 'function', e.file || null, e.func);
       const inv = {
         callSeq: e.seq, returnSeq: null,
         args: e.args || {}, returnValue: null,
-        caller: callerFunc, line: e.line,
+        caller: callerFunc, callerId, file: e.file || null, line: e.line,
         locals: {},   // accumulated as assigns happen
       };
       node.invocations.push(inv);
-      const edge = getEdge(callerFunc, e.func, 'function');
+      const edge = getEdge(callerId, calleeId, 'function');
       edge.calls.push(inv);
-      stack.push({func: e.func, invocation: inv});
+      stack.push({nodeId: calleeId, file: e.file || null, func: e.func, invocation: inv});
     } else if(e.type === 'return'){
       const top = stack.pop();
       if(top){
@@ -401,8 +519,9 @@ function buildCallGraph(events){
       const top = stack[stack.length-1];
       if(top) top.invocation.locals[e.var] = e.value;
     } else if(e.type === 'extcall'){
+      const callerId = stack.length ? stack[stack.length-1].nodeId : ROOT;
       const callerFunc = stack.length ? stack[stack.length-1].func : ROOT;
-      if(callerFunc === ROOT) getNode(ROOT, 'entry');
+      if(callerId === ROOT) getNode(ROOT, 'entry', null, ROOT);
       // External target: collapse to host so multiple GETs to same host group together.
       let host = e.target || '';
       try {
@@ -410,16 +529,16 @@ function buildCallGraph(events){
         host = u.host;
       } catch(_){ host = host.replace(/^https?:\/\//,'').split('/')[0]; }
       const exName = '↗ ' + host;
-      const node = getNode(exName, 'extcall');
+      const node = getNode(exName, 'extcall', null, exName);
       const inv = {
         callSeq: e.seq, returnSeq: e.seq,
         verb: e.verb, target: e.target, status: e.status,
         duration_ms: e.duration_ms,
         args: {}, returnValue: {repr: String(e.status), redacted: false},
-        caller: callerFunc, line: e.line, locals: {},
+        caller: callerFunc, callerId, line: e.line, locals: {},
       };
       node.invocations.push(inv);
-      const edge = getEdge(callerFunc, exName, 'extcall');
+      const edge = getEdge(callerId, exName, 'extcall');
       edge.calls.push(inv);
     }
   }
@@ -477,8 +596,10 @@ function activeStackAt(cur){
   for(let i=0; i<=last; i++){
     const e = events[i];
     if(!e) continue;
-    if(e.type === 'call') stack.push({func: e.func, callSeq: e.seq});
-    else if(e.type === 'return') stack.pop();
+    if(e.type === 'call'){
+      stack.push({nodeId: nodeIdOf(e.file, e.func), func: e.func,
+                  callSeq: e.seq, file: e.file || null});
+    } else if(e.type === 'return') stack.pop();
   }
   return stack;
 }
@@ -495,7 +616,20 @@ function load(t){
   }
   trace = t;
   events = t.events;
-  lines = ((t.session && t.session.source) || '').replace(/\n$/,'').split('\n');
+  const structureByFile = (t.session && t.session.structure_by_file) || {};
+  primaryFile = Object.keys(structureByFile)[0] || null;
+  const sourcesByFile = (t.session && t.session.sources_by_file) || null;
+  linesByFile = {};
+  if(sourcesByFile){
+    for(const path in sourcesByFile){
+      linesByFile[path] = (sourcesByFile[path] || '').replace(/\n$/,'').split('\n');
+    }
+  }
+  if(!Object.keys(linesByFile).length && primaryFile){
+    linesByFile[primaryFile] = ((t.session && t.session.source) || '').replace(/\n$/,'').split('\n');
+  }
+  currentFile = primaryFile;
+  userPinnedFile = null;
   cur = 0;
   selectedFunc = null;
   graph = buildCallGraph(events);
@@ -512,52 +646,67 @@ function load(t){
   }
   document.getElementById('tot').textContent = Math.max(events.length-1, 0);
   document.getElementById('scrub').max = Math.max(events.length-1, 0);
+  renderFileTabs();
   renderCode();
   render();
 }
 
 function renderCode(){
   const el = document.getElementById('code');
+  const lines = linesByFile[currentFile] || [];
   el.innerHTML = lines.map((ln,i)=>(
     '<div class="row" data-line="'+(i+1)+'"><span class="bar"></span>'+
     '<span class="ln">'+(i+1)+'</span><span class="src">'+(esc(ln)||' ')+'</span></div>'
   )).join('');
+  const lbl = document.getElementById('file-label');
+  if(lbl){
+    lbl.textContent = fileBasename(currentFile);
+    lbl.title = currentFile || '';
+    lbl.classList.toggle('swapped', !!(currentFile && currentFile !== primaryFile));
+    lbl.classList.toggle('pinned', !!userPinnedFile);
+  }
+  updateFileTabsHighlight();
 }
 
 function statusText(){
   if(!events.length) return ['', 'Load a trace.json to begin.'];
   const e = events[cur];
   if(!e) return ['', 'Ready.'];
+  // Format a "func" name with file prefix when multi-file
+  const qualify = (func, file) => {
+    if(Object.keys(linesByFile).length <= 1 || !file) return func;
+    return fileStem(file) + '.' + func;
+  };
   const top = activeStack[activeStack.length-1];
-  const where = top ? `inside ${top.func}` : 'between calls';
+  const where = top ? `inside ${qualify(top.func, top.file)}` : 'between calls';
   switch(e.type){
-    case 'call':    return ['call',    `Calling ${e.func}(…) at line ${e.line}`];
-    case 'return':  return ['return',  `Returning from ${e.func || '?'}`];
+    case 'call':    return ['call',    `Calling ${qualify(e.func, e.file)}(…) at line ${e.line}`];
+    case 'return':  return ['return',  `Returning from ${qualify(e.func || '?', e.file)}`];
     case 'extcall': return ['extcall', `External call: ${e.verb} ${e.target} → ${e.status}`];
     case 'exception': return ['exception',
-      `⚠ ${e.exc_type || 'Exception'}: ${e.message || ''}  ·  in ${e.func || ''} on line ${e.line}`];
+      `⚠ ${e.exc_type || 'Exception'}: ${e.message || ''}  ·  in ${qualify(e.func || '', e.file)} on line ${e.line}`];
     default:        return ['step',    `Step ${cur} — ${where}`];
   }
 }
 
 function render(){
   activeStack = activeStackAt(cur);
-  const activeNames = new Set(activeStack.map(f => f.func));
+  const activeIds = new Set(activeStack.map(f => f.nodeId));
   // Active edges = pairs of consecutive frames in the stack (entry→first, first→second, …)
   const activeEdgeKeys = new Set();
   let prev = '<entry>';
   for(const f of activeStack){
-    activeEdgeKeys.add(prev + '>' + f.func);
-    prev = f.func;
+    activeEdgeKeys.add(prev + '>' + f.nodeId);
+    prev = f.nodeId;
   }
   // If current event is an extcall, also mark its outbound edge active
   const curEv = events[cur];
   if(curEv && curEv.type === 'extcall'){
-    const caller = activeStack.length ? activeStack[activeStack.length-1].func : '<entry>';
+    const callerId = activeStack.length ? activeStack[activeStack.length-1].nodeId : '<entry>';
     let host;
     try { host = new URL(curEv.target).host; }
     catch(_){ host = (curEv.target||'').replace(/^https?:\/\//,'').split('/')[0]; }
-    activeEdgeKeys.add(caller + '>↗ ' + host);
+    activeEdgeKeys.add(callerId + '>↗ ' + host);
   }
 
   // status bar
@@ -566,12 +715,29 @@ function render(){
     '<span class="tag">'+esc(tag||'step')+'</span> '+esc(msg)+
     '<span class="hint">click a node to see args / returns</span>';
 
-  // Source-line highlight (red for exception, accent otherwise)
+  // Swap the SOURCE pane. While the player is playing, always auto-follow
+  // the active frame; only when stopped/paused does the user's pin take effect.
+  const innermost = activeStack.length ? activeStack[activeStack.length - 1] : null;
+  const curEvForLine = events[cur];
+  const pin = timer ? null : userPinnedFile;
+  const wantFile = pin
+                 || (innermost && innermost.file)
+                 || (curEvForLine && curEvForLine.file)
+                 || primaryFile;
+  if(wantFile && wantFile !== currentFile && linesByFile[wantFile]){
+    currentFile = wantFile;
+    renderCode();
+  } else {
+    updateFileTabsHighlight();
+  }
+
+  // Source-line highlight (red for exception, accent otherwise) — only when
+  // the event's file matches the file shown in the pane.
   document.querySelectorAll('.row.cur, .row.cur-exc').forEach(r => {
     r.classList.remove('cur'); r.classList.remove('cur-exc');
   });
-  const curEvForLine = events[cur];
-  if(curEvForLine && curEvForLine.line){
+  const sameFile = curEvForLine && (!curEvForLine.file || curEvForLine.file === currentFile);
+  if(curEvForLine && curEvForLine.line && sameFile){
     const r = document.querySelector('.row[data-line="'+curEvForLine.line+'"]');
     if(r){
       r.classList.add(curEvForLine.type === 'exception' ? 'cur-exc' : 'cur');
@@ -607,10 +773,10 @@ function render(){
   }
 
   // Pass 2: nodes
-  for(const [name, node] of graph.nodes){
-    const pos = positions.get(name);
+  for(const [nodeId, node] of graph.nodes){
+    const pos = positions.get(nodeId);
     if(!pos) continue;
-    drawNode(svgEl, name, node, pos, activeNames.has(name), name === selectedFunc);
+    drawNode(svgEl, nodeId, node, pos, activeIds.has(nodeId), nodeId === selectedFunc);
   }
 
   // Transport indicators
@@ -673,7 +839,7 @@ function drawEdgeLabel(parent, x, y, text, cls){
   svg('text', {x:w/2, y:13, 'text-anchor':'middle', class:cls}, g).textContent = t;
 }
 
-function drawNode(parent, name, node, pos, isActive, isSelected){
+function drawNode(parent, nodeId, node, pos, isActive, isSelected){
   const total = node.invocations.length;
   const isMulti = total > 1;
   const isExt = node.kind === 'extcall';
@@ -686,11 +852,12 @@ function drawNode(parent, name, node, pos, isActive, isSelected){
   if(isSelected) cls.push('selected');
 
   const g = svg('g', {transform:`translate(${pos.x - NODE_W/2},${pos.y - NODE_H/2})`,
-                      class:'node', 'data-func': name}, parent);
+                      class:'node', 'data-node-id': nodeId}, parent);
   svg('rect', {x:0, y:0, width:NODE_W, height:NODE_H, rx:12, ry:12, class:cls.join(' ')}, g);
   const labelCls = 'node-label' + (isEntry ? ' entry' : '');
+  const display = isEntry ? 'script start' : nodeDisplayName(node);
   svg('text', {x:NODE_W/2, y:isEntry ? 33 : 24, 'text-anchor':'middle', class:labelCls}, g)
-    .textContent = isEntry ? 'script start' : truncate(name, 18);
+    .textContent = truncate(display, 22);
   if(!isEntry){
     const sub = isExt ? `${total} call${total>1?'s':''}` :
                 isMulti ? `called ×${total}` :
@@ -699,7 +866,7 @@ function drawNode(parent, name, node, pos, isActive, isSelected){
   }
   if(!isEntry){
     g.addEventListener('click', () => {
-      selectedFunc = (selectedFunc === name) ? null : name;
+      selectedFunc = (selectedFunc === nodeId) ? null : nodeId;
       renderDetails();
       render();
     });
@@ -739,7 +906,12 @@ function renderDetails(){
   const activeIdx = node.invocations.findIndex(inv =>
     inv.callSeq <= cur && (inv.returnSeq == null || inv.returnSeq >= cur));
   let html = '';
-  html += '<h3>'+esc(selectedFunc)+'</h3>';
+  const heading = nodeDisplayName(node);
+  html += '<h3>'+esc(heading)+'</h3>';
+  if(node.file){
+    html += '<div class="summary" style="font-family:\'JetBrains Mono\',monospace; font-size:11.5px; opacity:.75">' +
+            esc(fileBasename(node.file)) + '</div>';
+  }
   html += '<div class="summary">' +
     (isExt
       ? `External target. Hit ${callCount} time${callCount>1?'s':''}.`
@@ -753,13 +925,15 @@ function renderDetails(){
     html += '    <span class="seq">#' + (idx+1) + ' &middot; seq ' + inv.callSeq + '</span>';
     html += '    <button class="scrubto" data-seq="' + inv.callSeq + '">scrub here</button>';
     html += '  </div>';
+    const callerNode = inv.callerId ? graph.nodes.get(inv.callerId) : null;
+    const callerDisplay = callerNode ? nodeDisplayName(callerNode) : (inv.caller || '');
     if(isExt){
       html += `  <div class="kv"><span class="k">${esc(inv.verb)}</span><span class="v">${esc(inv.target)}</span></div>`;
       html += `  <div class="kv"><span class="k">status</span><span class="v ${inv.status===200?'accent':'amber'}">${esc(inv.status)}</span></div>`;
       html += `  <div class="kv"><span class="k">took</span><span class="v">${esc(inv.duration_ms)} ms</span></div>`;
-      html += `  <div class="kv"><span class="k">called by</span><span class="v">${esc(inv.caller)}</span></div>`;
+      html += `  <div class="kv"><span class="k">called by</span><span class="v">${esc(callerDisplay)}</span></div>`;
     } else {
-      html += `  <div class="kv"><span class="k">called by</span><span class="v">${esc(inv.caller)}</span></div>`;
+      html += `  <div class="kv"><span class="k">called by</span><span class="v">${esc(callerDisplay)}</span></div>`;
       const argKeys = Object.keys(inv.args || {});
       if(argKeys.length){
         for(const k of argKeys){
@@ -1143,6 +1317,118 @@ render();
     if(e.target.classList && e.target.classList.contains('record-name') && e.key === 'Enter'){
       e.preventDefault(); e.target.blur();
     }
+  });
+})();
+
+// Download menu — exports the SVG canvas as SVG or a 2x-rasterized PNG.
+// Uses getBBox() so the export captures the full diagram regardless of
+// current zoom/pan, and inlines the document's <style> so the file
+// renders standalone.
+(function setupDownload(){
+  const btn = document.getElementById('dl-btn');
+  const menu = document.getElementById('dl-menu');
+  if(!btn || !menu) return;
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    document.querySelectorAll('.records-list.open').forEach(m => {
+      if(m !== menu) m.classList.remove('open');
+    });
+    menu.classList.toggle('open');
+  });
+  document.addEventListener('click', e => {
+    if(!menu.contains(e.target) && e.target !== btn) menu.classList.remove('open');
+  });
+
+  function baseName(){
+    const id = (typeof trace !== 'undefined' && trace && trace.session && trace.session.trace_id)
+      ? trace.session.trace_id : 'tracesnap';
+    const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+    const view = (document.title || 'view').toLowerCase()
+      .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'view';
+    return id + '-' + view + '-' + stamp;
+  }
+
+  function serializeSvg(){
+    const src = document.getElementById('canvas');
+    if(!src) return null;
+    let bx = 0, by = 0, bw = 0, bh = 0;
+    try {
+      const bbox = src.getBBox();
+      bx = bbox.x; by = bbox.y; bw = bbox.width; bh = bbox.height;
+    } catch(_){}
+    if(!bw || !bh){
+      bw = parseFloat(src.getAttribute('width'))  || src.clientWidth  || 800;
+      bh = parseFloat(src.getAttribute('height')) || src.clientHeight || 600;
+    }
+    const pad = 12;
+    bx -= pad; by -= pad; bw += pad*2; bh += pad*2;
+
+    const clone = src.cloneNode(true);
+    clone.setAttribute('width', bw);
+    clone.setAttribute('height', bh);
+    clone.setAttribute('viewBox', bx + ' ' + by + ' ' + bw + ' ' + bh);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+    const paper = getComputedStyle(document.body).backgroundColor || '#FAF7F0';
+    const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    bg.setAttribute('x', bx); bg.setAttribute('y', by);
+    bg.setAttribute('width', bw); bg.setAttribute('height', bh);
+    bg.setAttribute('fill', paper);
+    clone.insertBefore(bg, clone.firstChild);
+
+    const docStyle = document.querySelector('head > style');
+    if(docStyle){
+      const styleEl = document.createElementNS('http://www.w3.org/2000/svg','style');
+      styleEl.textContent = docStyle.textContent;
+      clone.insertBefore(styleEl, clone.firstChild);
+    }
+    return {xml: new XMLSerializer().serializeToString(clone), width: bw, height: bh};
+  }
+
+  function trigger(blob, name){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportSvg(){
+    const out = serializeSvg();
+    if(!out){ alert('Nothing to download yet — load a trace first.'); return; }
+    trigger(new Blob([out.xml], {type:'image/svg+xml;charset=utf-8'}), baseName()+'.svg');
+  }
+
+  function exportPng(){
+    const out = serializeSvg();
+    if(!out){ alert('Nothing to download yet — load a trace first.'); return; }
+    const scale = 2;
+    const url = URL.createObjectURL(new Blob([out.xml], {type:'image/svg+xml;charset=utf-8'}));
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = out.width * scale; c.height = out.height * scale;
+      const ctx = c.getContext('2d');
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0, out.width, out.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => trigger(b, baseName()+'.png'), 'image/png');
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      alert('PNG export failed — try SVG instead.');
+    };
+    img.src = url;
+  }
+
+  menu.addEventListener('click', e => {
+    const row = e.target.closest('.record-row');
+    if(!row) return;
+    menu.classList.remove('open');
+    if(row.dataset.fmt === 'svg') exportSvg();
+    else if(row.dataset.fmt === 'png') exportPng();
   });
 })();
 </script>

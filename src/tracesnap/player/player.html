@@ -97,6 +97,26 @@ main{
 .panel .cap{ font:600 11.5px "Hanken Grotesk",sans-serif; letter-spacing:.1em;
   text-transform:uppercase; color:var(--accent); padding:13px 16px 8px;
   border-bottom:1px solid var(--faint); background:var(--inset); flex:none }
+.panel.source .cap{ display:flex; align-items:center; gap:10px }
+.panel.source .cap .file-label{ margin-left:auto; font:500 11px "JetBrains Mono",monospace;
+  color:var(--ink-2); text-transform:none; letter-spacing:0 }
+.panel.source .cap .file-label.swapped{ color:var(--accent) }
+.panel.source .cap .file-label.pinned::before{ content:"📌 "; font-size:10px }
+.file-tabs{ display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+  padding:7px 12px; border-bottom:1px solid var(--faint);
+  background:var(--card); flex:none }
+.file-tabs:empty{ display:none }
+.file-tab{ font:500 11.5px "JetBrains Mono",monospace; color:var(--ink-2);
+  background:var(--inset); border:1px solid var(--faint); border-radius:7px;
+  padding:3px 9px; cursor:pointer; user-select:none;
+  transition:border-color .15s, color .15s, background .15s }
+.file-tab:hover{ border-color:var(--accent-line); color:var(--ink) }
+.file-tab.active{ background:var(--accent-soft); color:var(--accent);
+  border-color:var(--accent-line); font-weight:600 }
+.file-tab.pinned::after{ content:" 📌"; font-size:10px }
+.file-tabs.playing .file-tab{ opacity:.45; cursor:default; pointer-events:none }
+.file-tabs .hint{ font:500 10.5px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  margin-left:auto; letter-spacing:.04em; text-transform:uppercase; opacity:.7 }
 /* Source = full-height left column; only #code scrolls inside */
 .panel.source{ display:flex; flex-direction:column; min-height:0; overflow:hidden }
 /* Right column: scrolls as a whole. Each panel takes its natural content
@@ -230,6 +250,7 @@ footer{ position:sticky; bottom:0; background:var(--card);
 <header>
   <h1>Trace Player</h1>
   <span class="sub">record once · replay anywhere</span>
+  <a class="loadbtn" href="home.html">&larr; TraceSnap</a>
   <a class="loadbtn" href="simulator.html">&uarr; Simulator view</a>
   <a class="loadbtn" href="call_graph.html">&uarr; Call graph</a>
   <a class="loadbtn" href="event_graph.html">&uarr; Event graph</a>
@@ -246,7 +267,8 @@ footer{ position:sticky; bottom:0; background:var(--card);
 
 <main>
   <section class="panel source">
-    <div class="cap">Source</div>
+    <div class="cap">Source<span class="file-label" id="file-label" title=""></span></div>
+    <div class="file-tabs" id="file-tabs"></div>
     <div id="code"></div>
   </section>
   <div class="rightcol">
@@ -738,9 +760,75 @@ footer{ position:sticky; bottom:0; background:var(--card);
   ]
 };</script>
 <script>
-let trace = TRACE, events = [], lines = [], cur = 0, timer = null;
+let trace = TRACE, events = [], cur = 0, timer = null;
 let calls = [];   // ordered list of call frames with full per-variable value history
 let exceptionSeqs = [];   // seqs of all `exception` events for the Jump button
+let linesByFile = {}, primaryFile = null, currentFile = null;
+let userPinnedFile = null;   // when set, overrides auto-follow
+
+function fileBasename(p){
+  if(!p) return '';
+  const s = String(p).replace(/\\/g, '/');
+  const i = s.lastIndexOf('/');
+  return i >= 0 ? s.slice(i+1) : s;
+}
+function fileStem(p){
+  const b = fileBasename(p);
+  return b.endsWith('.py') ? b.slice(0, -3) : b;
+}
+function qualifyFunc(func, file){
+  if(!file || Object.keys(linesByFile).length <= 1) return func;
+  return fileStem(file) + '.' + func;
+}
+
+function renderFileTabs(){
+  const wrap = document.getElementById('file-tabs');
+  if(!wrap) return;
+  const paths = Object.keys(linesByFile);
+  if(paths.length <= 1){ wrap.innerHTML = ''; return; }
+  const ordered = [primaryFile].concat(
+    paths.filter(p => p !== primaryFile).sort((a,b) =>
+      fileBasename(a).localeCompare(fileBasename(b))));
+  wrap.innerHTML = ordered.map(p =>
+    '<span class="file-tab" data-path="'+esc(p)+'" title="'+esc(p)+'">'+
+    esc(fileBasename(p))+'</span>').join('') +
+    '<span class="hint">click to pin · click again to follow</span>';
+  wrap.querySelectorAll('.file-tab').forEach(t => {
+    t.addEventListener('click', () => {
+      if(timer) return;
+      const p = t.dataset.path;
+      if(userPinnedFile === p){
+        userPinnedFile = null;
+      } else {
+        userPinnedFile = p;
+        cur = jumpToLastEventInFile(p, cur);
+        document.getElementById('cur').textContent = cur;
+        document.getElementById('scrub').value = cur;
+      }
+      render();
+    });
+  });
+}
+
+function jumpToLastEventInFile(file, fromCur){
+  const last = Math.min(fromCur, events.length-1);
+  for(let i = last; i >= 0; i--){
+    if(events[i] && events[i].file === file) return i;
+  }
+  for(let i = last+1; i < events.length; i++){
+    if(events[i] && events[i].file === file) return i;
+  }
+  return fromCur;
+}
+
+function updateFileTabsHighlight(){
+  const wrap = document.getElementById('file-tabs');
+  if(wrap) wrap.classList.toggle('playing', !!timer);
+  document.querySelectorAll('#file-tabs .file-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.path === currentFile);
+    t.classList.toggle('pinned', userPinnedFile === t.dataset.path);
+  });
+}
 
 function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function valStr(v){ return v && v.redacted ? '<span class="redacted">'+esc(v.repr)+'</span>' : esc(v.repr); }
@@ -753,7 +841,8 @@ function buildCalls(evs){
   const stack = [];   // indices into `out` for currently-open frames
   for(const e of evs){
     if(e.type==='call'){
-      const fr = { seq:e.seq, func:e.func, line:e.line, depth:e.depth, vars:{}, open:true };
+      const fr = { seq:e.seq, func:e.func, file:e.file||null,
+                   line:e.line, depth:e.depth, vars:{}, open:true };
       for(const k in (e.args||{})){
         (fr.vars[k] = fr.vars[k] || []).push({
           seq:e.seq, line:e.line, value:e.args[k], prev:null, kind:'arg', ci:0
@@ -781,12 +870,26 @@ function load(t){
   }
   trace = t;
   events = t.events;
-  lines = ((t.session && t.session.source) || "").replace(/\n$/,"").split("\n");
+  const structureByFile = (t.session && t.session.structure_by_file) || {};
+  primaryFile = Object.keys(structureByFile)[0] || null;
+  const sourcesByFile = (t.session && t.session.sources_by_file) || null;
+  linesByFile = {};
+  if(sourcesByFile){
+    for(const path in sourcesByFile){
+      linesByFile[path] = (sourcesByFile[path] || "").replace(/\n$/,"").split("\n");
+    }
+  }
+  if(!Object.keys(linesByFile).length && primaryFile){
+    linesByFile[primaryFile] = ((t.session && t.session.source) || "").replace(/\n$/,"").split("\n");
+  }
+  currentFile = primaryFile;
+  userPinnedFile = null;
   calls = buildCalls(events);
   exceptionSeqs = events.filter(e => e.type === 'exception').map(e => e.seq);
   cur = 0;
   document.getElementById('tot').textContent = Math.max(events.length-1,0);
   document.getElementById('scrub').max = Math.max(events.length-1,0);
+  renderFileTabs();
   renderCode();
   renderVars();
   renderExcBtn();
@@ -803,10 +906,19 @@ function renderExcBtn(){
 
 function renderCode(){
   const el = document.getElementById('code');
+  const lines = linesByFile[currentFile] || [];
   el.innerHTML = lines.map((ln,i)=>(
     '<div class="row" data-line="'+(i+1)+'"><span class="bar"></span>'+
     '<span class="ln">'+(i+1)+'</span><span class="src">'+(esc(ln)||" ")+'</span></div>'
   )).join('');
+  const lbl = document.getElementById('file-label');
+  if(lbl){
+    lbl.textContent = fileBasename(currentFile);
+    lbl.title = currentFile || '';
+    lbl.classList.toggle('swapped', !!(currentFile && currentFile !== primaryFile));
+    lbl.classList.toggle('pinned', !!userPinnedFile);
+  }
+  updateFileTabsHighlight();
 }
 
 // Render the Variables panel once per trace load. The active-pill highlight
@@ -837,7 +949,7 @@ function renderVars(){
           return '<div class="varrow" data-var="'+esc(nm)+'" data-frame="'+fi+
                  '"><span class="nm">'+esc(nm)+'</span><div class="pills">'+pills+'</div></div>';
         }).join('');
-    return '<div class="frame" data-fi="'+fi+'"><div class="fh"><code>'+esc(fr.func)+'</code>'+suffix+'</div>'+body+'</div>';
+    return '<div class="frame" data-fi="'+fi+'"><div class="fh"><code>'+esc(qualifyFunc(fr.func, fr.file))+'</code>'+suffix+'</div>'+body+'</div>';
   }).join('');
 }
 
@@ -879,7 +991,8 @@ function compute(){
     if(e.type==='call'){
       const vars = {};
       for(const k in (e.args||{})) vars[k] = {repr:e.args[k].repr, redacted:e.args[k].redacted, type:e.args[k].type, ci:0};
-      const frame = {seq:e.seq, func:e.func, params:Object.keys(e.args||{}),
+      const frame = {seq:e.seq, func:e.func, file:e.file||null,
+                     params:Object.keys(e.args||{}),
                      vars, active:true, raised:false};
       liveStack.push(frame);
       frames.push(frame);
@@ -905,16 +1018,20 @@ function nowText(e, st){
   if(!e) return '';
   if(e.type==='call'){
     const a = Object.entries(e.args||{}).map(([k,v])=>k+'='+'<span class="v">'+valStr(v)+'</span>').join(', ');
-    return 'Entered <code>'+esc(e.func)+'</code>('+a+')';
+    return 'Entered <code>'+esc(qualifyFunc(e.func, e.file))+'</code>('+a+')';
   }
-  if(e.type==='return') return 'Returned <span class="v">'+valStr(e.value)+'</span> from <code>'+esc(e.func)+'</code>';
+  if(e.type==='return') return 'Returned <span class="v">'+valStr(e.value)+'</span> from <code>'+esc(qualifyFunc(e.func, e.file))+'</code>';
   if(e.type==='assign'){
     if(e.prev==null) return '<code>'+esc(e.var)+'</code> set to <span class="v">'+valStr(e.value)+'</span>';
     return '<code>'+esc(e.var)+'</code> changed from '+valStr(e.prev)+' to <span class="v">'+valStr(e.value)+'</span>';
   }
   if(e.type==='branch') return 'Took the <span class="v">'+esc(e.taken)+'</span> branch';
   if(e.type==='loop') return 'Loop pass <span class="v">'+(e.iteration+1)+'</span>';
-  if(e.type==='line'){ const t=(lines[e.line-1]||'').trim(); return 'Running <code>'+esc(t)+'</code>'; }
+  if(e.type==='line'){
+    const arr = linesByFile[e.file || currentFile] || [];
+    const t=(arr[e.line-1]||'').trim();
+    return 'Running <code>'+esc(t)+'</code>';
+  }
   if(e.type==='extcall'){
     const status = e.status!=null ? ' &rarr; <span class="v">'+esc(String(e.status))+'</span>' : '';
     const dur = e.duration_ms!=null ? ' in <span class="v">'+esc(String(e.duration_ms))+'ms</span>' : '';
@@ -923,7 +1040,7 @@ function nowText(e, st){
   if(e.type==='exception'){
     return '<span class="exc-msg">&#9888; '+esc(e.exc_type||'Exception')+
            ': '+esc(e.message||'')+'</span><br><span style="color:var(--ink-2); font-size:12.5px">raised on line '+
-           (e.line||'?')+' in <code>'+esc(e.func||'')+'</code></span>';
+           (e.line||'?')+' in <code>'+esc(qualifyFunc(e.func||'', e.file))+'</code></span>';
   }
   return e.type;
 }
@@ -931,11 +1048,28 @@ function nowText(e, st){
 function render(){
   const {stack, frames, changedHere, e} = compute();
 
-  // code highlight (red for exception, accent green otherwise)
+  // Swap the SOURCE pane. While the player is playing, always auto-follow
+  // the active frame; only when stopped/paused does the user's pin take effect.
+  const innermost = stack.length ? stack[stack.length-1] : null;
+  const pin = timer ? null : userPinnedFile;
+  const wantFile = pin
+                 || (innermost && innermost.file)
+                 || (e && e.file)
+                 || primaryFile;
+  if(wantFile && wantFile !== currentFile && linesByFile[wantFile]){
+    currentFile = wantFile;
+    renderCode();
+  } else {
+    updateFileTabsHighlight();
+  }
+
+  // code highlight (red for exception, accent green otherwise) — only when
+  // the current event's file matches the file shown in the pane.
   document.querySelectorAll('.row.cur, .row.cur-exc').forEach(r=>{
     r.classList.remove('cur'); r.classList.remove('cur-exc');
   });
-  if(e && e.line){
+  const sameFile = e && (!e.file || e.file === currentFile);
+  if(e && e.line && sameFile){
     const r = document.querySelector('.row[data-line="'+e.line+'"]');
     if(r){
       r.classList.add(e.type==='exception' ? 'cur-exc' : 'cur');
@@ -981,7 +1115,7 @@ function render(){
         return '<div class="var'+(isCh?' changed':'')+'"><span class="nm">'+esc(nm)+'</span>'+
           valhtml+'<span class="cnt">&times;'+(v.ci||0)+'</span></div>';
       }).join('') || '<div class="empty">no locals yet</div>';
-      return '<div class="'+cls+'"><div class="fh"><code>'+esc(f.func)+'</code>'+tag+'</div>'+rows+'</div>';
+      return '<div class="'+cls+'"><div class="fh"><code>'+esc(qualifyFunc(f.func, f.file))+'</code>'+tag+'</div>'+rows+'</div>';
     }).join('');
   }
 

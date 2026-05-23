@@ -32,11 +32,13 @@ def _diff(sess, frame, attribute_line):
         if name not in prev:
             sess.change_counts[name] = 0
             sess.emit(type="assign", var=name, scope="local", line=attribute_line,
+                      file=fname,
                       value=sess.cap(name, val), prev=None, change_index=0,
                       parent_seq=parent)
         elif _changed(prev[name], val):
             sess.change_counts[name] = sess.change_counts.get(name, 0) + 1
             sess.emit(type="assign", var=name, scope="local", line=attribute_line,
+                      file=fname,
                       value=sess.cap(name, val), prev=sess.cap(name, prev[name]),
                       change_index=sess.change_counts[name],
                       parent_seq=parent)
@@ -59,14 +61,15 @@ def _local_trace(frame, event, arg):
             emitted = sess.seq
             if t["kind"] == "loop":
                 sess.loop_iters[t["node_id"]] = sess.loop_iters.get(t["node_id"], -1) + 1
-                sess.emit(type="loop", node_id=t["node_id"], line=line,
+                sess.emit(type="loop", node_id=t["node_id"], line=line, file=fname,
                           iteration=sess.loop_iters[t["node_id"]], parent_seq=parent)
             else:
-                sess.emit(type="branch", node_id=t["node_id"], line=line,
+                sess.emit(type="branch", node_id=t["node_id"], line=line, file=fname,
                           taken=t["label"], parent_seq=parent)
             sess.last_struct_event.setdefault(fid, {})[t["node_id"]] = emitted
         parent = sess.resolve_parent(fid, fname, line)
-        sess.emit(type="line", line=line, func=frame.f_code.co_name, parent_seq=parent)
+        sess.emit(type="line", line=line, file=fname,
+                  func=frame.f_code.co_name, parent_seq=parent)
         sess.last_line[fid] = line
         sess.last_app_file = fname
         sess.last_app_fid = fid
@@ -77,11 +80,13 @@ def _local_trace(frame, event, arg):
         # If this frame raised, mark the return as an unwind (no value).
         is_unwind = sess._unwinding.get(fid, False)
         if is_unwind:
-            sess.emit(type="return", line=frame.f_lineno, func=frame.f_code.co_name,
+            sess.emit(type="return", line=frame.f_lineno, file=fname,
+                      func=frame.f_code.co_name,
                       value=None, unwind=True, parent_seq=parent)
         else:
             sess.emit(type="return", value=sess.cap(None, arg),
-                      line=frame.f_lineno, func=frame.f_code.co_name, parent_seq=parent)
+                      line=frame.f_lineno, file=fname,
+                      func=frame.f_code.co_name, parent_seq=parent)
         if sess.stack and sess.stack[-1] == fid:
             sess.stack.pop()
         sess.prev_locals.pop(fid, None)
@@ -104,6 +109,7 @@ def _local_trace(frame, event, arg):
                 message=msg[:200],
                 value=sess.cap(None, exc_value),
                 line=line,
+                file=fname,
                 func=frame.f_code.co_name,
                 parent_seq=parent,
             )
@@ -135,7 +141,7 @@ def _global_trace(frame, event, arg):
             cfile = caller.f_code.co_filename
             if cfile in sess.source_files_set:
                 parent = sess.resolve_parent(id(caller), cfile, caller.f_lineno)
-        sess.emit(type="call", func=co_name, line=frame.f_lineno,
+        sess.emit(type="call", func=co_name, line=frame.f_lineno, file=fname,
                   args={k: sess.cap(k, v) for k, v in frame.f_locals.items()},
                   parent_seq=parent)
         return _local_trace

@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TraceSnap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FAF7F0; --card:#FFFDF8; --inset:#F2ECE0;
+  --ink:#211E18; --ink-2:#6B655A; --faint:#E7E0D2;
+  --accent:#0F6E56; --accent-soft:#0F6E5618; --accent-line:#0F6E5640;
+  --amber:#9C5A12; --amber-bg:#F6E6CE; --amber-line:#BA751755;
+  --purple:#7B4B9F; --purple-bg:#7B4B9F18; --purple-line:#7B4B9F55;
+  --danger:#c92a2a;
+  --shadow:0 1px 2px rgba(40,33,20,.05),0 8px 28px rgba(40,33,20,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#1A1815; --card:#221F1B; --inset:#2A2620;
+    --ink:#ECE6DA; --ink-2:#A39C8C; --faint:#332E26;
+    --accent:#5BC6A1; --accent-soft:#5BC6A11f; --accent-line:#5BC6A150;
+    --amber:#E6AE5C; --amber-bg:#3A2E1C; --amber-line:#E6AE5c44;
+    --purple:#C39BE6; --purple-bg:#C39BE61f; --purple-line:#C39BE655;
+    --danger:#f0735c;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.25);
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:"Hanken Grotesk",system-ui,sans-serif; font-size:15px; line-height:1.55;
+  display:flex; flex-direction:column; min-height:100vh;
+}
+
+/* ------------------------ Header ------------------------ */
+header{
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  padding:18px 28px; border-bottom:1px solid var(--faint);
+  background:var(--card);
+}
+.brand{ display:flex; align-items:center; gap:12px; margin-right:auto; text-decoration:none; color:inherit; }
+.brand-mark{
+  width:34px; height:34px; border-radius:9px; background:var(--accent);
+  display:flex; align-items:center; justify-content:center;
+  color:#fff; font:700 18px "Fraunces",serif; letter-spacing:-.02em;
+  box-shadow:0 2px 8px var(--accent-line);
+}
+@media (prefers-color-scheme:dark){ .brand-mark{ color:#10221C } }
+.brand-text h1{
+  font-family:"Fraunces",serif; font-weight:600; font-size:22px; margin:0;
+  letter-spacing:-.015em; line-height:1.1;
+}
+.brand-text .tag{ color:var(--ink-2); font-size:12.5px; letter-spacing:.01em }
+.navlink{
+  font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink);
+  background:var(--card); border:1px solid var(--faint); border-radius:9px;
+  padding:8px 14px; cursor:pointer; text-decoration:none; display:inline-flex;
+  align-items:center; gap:6px;
+  transition:border-color .15s, background .15s;
+}
+.navlink:hover{ border-color:var(--accent-line); background:var(--inset) }
+.navlink.primary{
+  background:var(--accent); color:#fff; border-color:var(--accent);
+}
+@media (prefers-color-scheme:dark){ .navlink.primary{ color:#10221C } }
+.navlink.primary:hover{ filter:brightness(1.05); background:var(--accent) }
+
+/* ------------------------ Layout ------------------------ */
+main{
+  flex:1; width:100%; max-width:1100px; margin:0 auto;
+  padding:28px 28px 60px;
+  display:grid; grid-template-columns: 1fr; gap:24px;
+}
+
+.card{
+  background:var(--card); border:1px solid var(--faint); border-radius:14px;
+  box-shadow:var(--shadow); padding:22px 24px;
+}
+.card h2{
+  font:600 17px "Fraunces",serif; margin:0 0 14px; letter-spacing:-.01em;
+  display:flex; align-items:center; gap:10px;
+}
+.card h2 .count{
+  font:500 11.5px "JetBrains Mono",monospace; color:var(--ink-2);
+  background:var(--inset); padding:2px 8px; border-radius:5px; border:1px solid var(--faint);
+}
+.section-cap{
+  font:600 11px "Hanken Grotesk",sans-serif; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-2); margin:0 0 10px;
+}
+
+/* ------------------------ Instructions ------------------------ */
+.instructions{ position:relative }
+.instructions-grid{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+  gap:14px; margin-top:10px;
+}
+.step{
+  background:var(--paper); border:1px solid var(--faint); border-radius:10px;
+  padding:14px 16px;
+}
+.step .num{
+  display:inline-flex; width:22px; height:22px; border-radius:50%;
+  background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-line);
+  font:600 12px "Hanken Grotesk",sans-serif; align-items:center; justify-content:center;
+  margin-right:8px;
+}
+.step h3{ font:600 14.5px "Hanken Grotesk",sans-serif; margin:0 0 6px;
+  display:flex; align-items:center }
+.step p{ margin:0; font-size:13.5px; color:var(--ink-2); line-height:1.5 }
+.step code, .inline-code{
+  font:500 12px "JetBrains Mono",monospace;
+  background:var(--inset); padding:1.5px 6px; border-radius:4px;
+  color:var(--ink); border:1px solid var(--faint);
+}
+.views-row{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px }
+.view-pill{
+  font:500 11.5px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  background:var(--inset); border:1px solid var(--faint);
+  padding:3px 9px; border-radius:5px;
+}
+
+.collapse-toggle{
+  position:absolute; top:18px; right:20px;
+  font:500 12px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  background:transparent; border:1px solid var(--faint); border-radius:7px;
+  padding:5px 10px; cursor:pointer;
+}
+.collapse-toggle:hover{ border-color:var(--accent-line); color:var(--ink) }
+
+/* ------------------------ Records list ------------------------ */
+.record-toolbar{
+  display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap;
+}
+.search-input{
+  flex:1; min-width:200px;
+  font:500 13px "Hanken Grotesk",sans-serif; color:var(--ink);
+  background:var(--paper); border:1px solid var(--faint); border-radius:8px;
+  padding:8px 12px; outline:none;
+}
+.search-input:focus{ border-color:var(--accent) }
+.sort-select{
+  font:500 12.5px "Hanken Grotesk",sans-serif; color:var(--ink);
+  background:var(--paper); border:1px solid var(--faint); border-radius:8px;
+  padding:8px 10px; outline:none; cursor:pointer;
+}
+
+.records-table{
+  border:1px solid var(--faint); border-radius:10px; overflow:hidden;
+  background:var(--paper);
+}
+.record-row{
+  display:grid;
+  grid-template-columns: 1fr 110px 90px 200px;
+  gap:14px; align-items:center;
+  padding:12px 16px; border-top:1px solid var(--faint);
+  transition:background .15s;
+}
+.record-row:first-child{ border-top:none }
+.record-row:hover{ background:var(--inset) }
+
+.r-main{ min-width:0 }
+.r-name{
+  font:600 14px "Hanken Grotesk",sans-serif; color:var(--ink);
+  display:flex; align-items:center; gap:8px; cursor:pointer;
+  padding:1px 3px; border-radius:4px; outline:none;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.r-name:hover{ color:var(--accent) }
+.r-name[contenteditable="true"]:focus{
+  background:var(--card); outline:1px solid var(--accent); cursor:text; color:var(--ink);
+}
+.r-meta{
+  font:500 11.5px "JetBrains Mono",monospace; color:var(--ink-2);
+  margin-top:3px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.r-meta .sep{ color:var(--faint); padding:0 6px }
+.r-kind{
+  font:500 11px "Hanken Grotesk",sans-serif; letter-spacing:.05em;
+  text-transform:uppercase; color:var(--accent);
+  background:var(--accent-soft); border:1px solid var(--accent-line);
+  padding:3px 8px; border-radius:5px; text-align:center;
+}
+.r-kind.http{ color:var(--purple); background:var(--purple-bg); border-color:var(--purple-line) }
+.r-events{
+  font:500 12px "JetBrains Mono",monospace; color:var(--ink-2);
+  text-align:right;
+}
+.r-events b{ font-weight:600; color:var(--ink); font-size:14px }
+.r-actions{ display:flex; gap:6px; justify-content:flex-end; flex-wrap:wrap }
+.act{
+  font:500 11.5px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  background:var(--card); border:1px solid var(--faint); border-radius:6px;
+  padding:5px 9px; cursor:pointer; text-decoration:none; display:inline-block;
+  transition:border-color .15s, color .15s;
+}
+.act:hover{ border-color:var(--accent-line); color:var(--accent) }
+.act.del:hover{ border-color:var(--danger); color:var(--danger) }
+
+.empty{
+  padding:40px 20px; text-align:center; color:var(--ink-2);
+}
+.empty .big{ font:600 16px "Fraunces",serif; color:var(--ink); margin-bottom:6px }
+.empty .small{ font-size:13.5px; line-height:1.6 }
+.empty code{
+  font:500 12px "JetBrains Mono",monospace;
+  background:var(--inset); padding:2px 8px; border-radius:5px;
+  border:1px solid var(--faint); color:var(--ink);
+}
+
+.hidden{ display:none !important }
+
+@media (max-width:680px){
+  .record-row{ grid-template-columns: 1fr; gap:6px }
+  .r-events, .r-kind{ text-align:left }
+  .r-actions{ justify-content:flex-start }
+  header{ padding:14px 18px }
+  main{ padding:18px 18px 40px }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="home.html" class="brand">
+    <span class="brand-mark">T</span>
+    <span class="brand-text">
+      <h1>TraceSnap</h1>
+      <div class="tag">Record once, replay anywhere.</div>
+    </span>
+  </a>
+  <a class="navlink primary" href="record.html">+ New record</a>
+</header>
+
+<main>
+
+  <!-- ============================== INSTRUCTIONS ============================== -->
+  <section class="card instructions" id="instructions">
+    <h2>Getting started</h2>
+    <button class="collapse-toggle" id="collapse-instructions">Hide</button>
+
+    <div id="instructions-body">
+      <p style="margin:0 0 6px; color:var(--ink-2); font-size:13.5px">
+        Capture a Python script under instrumentation, then scrub through every line, branch, assignment, and HTTP call in three visual views.
+      </p>
+
+      <div class="instructions-grid">
+
+        <div class="step">
+          <h3><span class="num">1</span>Record a trace</h3>
+          <p>Click <b>+ New record</b> above to pick a <code>.py</code> file and run it interactively, or in your terminal:</p>
+          <p style="margin-top:8px"><span class="inline-code">tracesnap record path/to/script.py</span></p>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">2</span>Open a record</h3>
+          <p>Every recording lands in the <b>library</b> below. Click a record's name to open it, or use the action buttons to pick a specific view.</p>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">3</span>Switch views</h3>
+          <p>Each trace has four equivalent visualisations:</p>
+          <div class="views-row">
+            <span class="view-pill">Text</span>
+            <span class="view-pill">Simulator</span>
+            <span class="view-pill">Call graph</span>
+            <span class="view-pill">Event graph</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== RECORDS ============================== -->
+  <section class="card">
+    <h2>Library <span class="count" id="record-count">…</span></h2>
+
+    <div class="record-toolbar">
+      <input class="search-input" id="record-search" type="search"
+             placeholder="Filter by name, id, source path…" autocomplete="off">
+      <select class="sort-select" id="record-sort">
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="name">Name (A→Z)</option>
+        <option value="events">Most events</option>
+      </select>
+      <a class="navlink" href="record.html" style="border-color:var(--accent-line); color:var(--accent)">+ New record</a>
+    </div>
+
+    <div id="records-container">
+      <div class="empty"><div class="small">Loading…</div></div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDate(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d)) return iso;
+  const now = new Date();
+  const diff = (now - d) / 1000;
+  if(diff < 60) return 'just now';
+  if(diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if(diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  if(diff < 86400*7) return Math.floor(diff/86400) + 'd ago';
+  return d.toLocaleDateString();
+}
+
+// ---- Collapse instructions (persist preference) ----
+const collapseBtn = document.getElementById('collapse-instructions');
+const instructionsBody = document.getElementById('instructions-body');
+function applyCollapse(collapsed){
+  instructionsBody.classList.toggle('hidden', collapsed);
+  collapseBtn.textContent = collapsed ? 'Show' : 'Hide';
+}
+applyCollapse(localStorage.getItem('ts-instructions-hidden') === '1');
+collapseBtn.addEventListener('click', () => {
+  const willHide = !instructionsBody.classList.contains('hidden');
+  localStorage.setItem('ts-instructions-hidden', willHide ? '1' : '0');
+  applyCollapse(willHide);
+});
+
+// ---- Records list ----
+const recordsContainer = document.getElementById('records-container');
+const recordCount = document.getElementById('record-count');
+const searchInput = document.getElementById('record-search');
+const sortSelect = document.getElementById('record-sort');
+let _records = [];
+
+function sortRecords(records, mode){
+  const out = records.slice();
+  if(mode === 'newest') out.sort((a,b) => (b.created_ts||0) - (a.created_ts||0));
+  else if(mode === 'oldest') out.sort((a,b) => (a.created_ts||0) - (b.created_ts||0));
+  else if(mode === 'name') out.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  else if(mode === 'events') out.sort((a,b) => (b.event_count||0) - (a.event_count||0));
+  return out;
+}
+
+function filterRecords(records, q){
+  if(!q) return records;
+  const ql = q.toLowerCase();
+  return records.filter(r =>
+    (r.name||'').toLowerCase().includes(ql) ||
+    (r.id||'').toLowerCase().includes(ql) ||
+    (r.source||'').toLowerCase().includes(ql) ||
+    (r.kind||'').toLowerCase().includes(ql)
+  );
+}
+
+function render(){
+  const q = searchInput.value.trim();
+  const mode = sortSelect.value;
+  const shown = sortRecords(filterRecords(_records, q), mode);
+
+  recordCount.textContent = _records.length === 0
+    ? '0 records'
+    : (q ? `${shown.length} of ${_records.length}` : `${_records.length} record${_records.length===1?'':'s'}`);
+
+  if(!_records.length){
+    recordsContainer.innerHTML = `
+      <div class="empty">
+        <div class="big">No traces yet</div>
+        <div class="small">
+          Capture your first one with <code>tracesnap record path/to/script.py</code><br>
+          or click <b>+ New record</b> above.
+        </div>
+      </div>`;
+    return;
+  }
+  if(!shown.length){
+    recordsContainer.innerHTML = `
+      <div class="empty">
+        <div class="small">No records match <b>${esc(q)}</b>.</div>
+      </div>`;
+    return;
+  }
+
+  const html = '<div class="records-table">' + shown.map(r => {
+    const kind = (r.kind || 'script').toLowerCase();
+    const kindCls = kind === 'http' || kind === 'request' ? 'http' : '';
+    const src = r.source || '';
+    const srcShort = src.length > 60 ? '…' + src.slice(-58) : src;
+    return `
+      <div class="record-row" data-id="${esc(r.id)}">
+        <div class="r-main">
+          <div class="r-name" data-id="${esc(r.id)}" title="Click to open · double-click to rename">${esc(r.name || r.id)}</div>
+          <div class="r-meta">
+            <span title="${esc(r.id)}">${esc(r.id)}</span>
+            ${src ? '<span class="sep">·</span><span title="' + esc(src) + '">' + esc(srcShort) + '</span>' : ''}
+            <span class="sep">·</span><span title="${esc(r.created||'')}">${esc(fmtDate(r.created))}</span>
+          </div>
+        </div>
+        <div class="r-kind ${kindCls}">${esc(kind)}</div>
+        <div class="r-events"><b>${r.event_count||0}</b> events</div>
+        <div class="r-actions">
+          <a class="act" href="call_graph.html?id=${encodeURIComponent(r.id)}">Call graph</a>
+          <a class="act" href="event_graph.html?id=${encodeURIComponent(r.id)}">Events</a>
+          <a class="act" href="simulator.html?id=${encodeURIComponent(r.id)}">Simulator</a>
+          <a class="act" href="player.html?id=${encodeURIComponent(r.id)}">Text</a>
+          <button class="act del" data-act="delete" data-id="${esc(r.id)}" title="Delete this record">Delete</button>
+        </div>
+      </div>`;
+  }).join('') + '</div>';
+  recordsContainer.innerHTML = html;
+}
+
+async function load(){
+  try{
+    const r = await fetch('/api/traces');
+    _records = await r.json();
+  } catch(e){
+    recordsContainer.innerHTML = `<div class="empty"><div class="small">Failed to load records: ${esc(e.message)}</div></div>`;
+    return;
+  }
+  render();
+}
+
+// Delegated handlers
+recordsContainer.addEventListener('click', async (ev) => {
+  const delBtn = ev.target.closest('button[data-act="delete"]');
+  if(delBtn){
+    const id = delBtn.dataset.id;
+    const rec = _records.find(r => r.id === id);
+    const name = rec ? (rec.name || id) : id;
+    if(!confirm(`Delete "${name}"?\n\nThis removes the trace from the library permanently.`)) return;
+    try{
+      const r = await fetch('/api/traces/' + encodeURIComponent(id), {method:'DELETE'});
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      _records = _records.filter(x => x.id !== id);
+      render();
+    } catch(e){
+      alert('Delete failed: ' + e.message);
+    }
+    return;
+  }
+
+  // Clicking the name opens the default (call graph) view — single click.
+  const nameEl = ev.target.closest('.r-name');
+  if(nameEl && nameEl.getAttribute('contenteditable') !== 'true'){
+    location.href = 'call_graph.html?id=' + encodeURIComponent(nameEl.dataset.id);
+  }
+});
+
+// Double-click name to rename inline
+recordsContainer.addEventListener('dblclick', (ev) => {
+  const nameEl = ev.target.closest('.r-name');
+  if(!nameEl) return;
+  ev.preventDefault();
+  nameEl.setAttribute('contenteditable', 'true');
+  nameEl.focus();
+  // select all
+  const range = document.createRange();
+  range.selectNodeContents(nameEl);
+  const sel = window.getSelection();
+  sel.removeAllRanges(); sel.addRange(range);
+});
+recordsContainer.addEventListener('keydown', (ev) => {
+  const nameEl = ev.target.closest('.r-name[contenteditable="true"]');
+  if(!nameEl) return;
+  if(ev.key === 'Enter'){ ev.preventDefault(); nameEl.blur(); }
+  if(ev.key === 'Escape'){ ev.preventDefault(); nameEl.textContent = (_records.find(r=>r.id===nameEl.dataset.id)||{}).name || ''; nameEl.blur(); }
+});
+recordsContainer.addEventListener('blur', async (ev) => {
+  const nameEl = ev.target.closest('.r-name[contenteditable="true"]');
+  if(!nameEl) return;
+  nameEl.removeAttribute('contenteditable');
+  const id = nameEl.dataset.id;
+  const newName = nameEl.textContent.trim();
+  const rec = _records.find(r => r.id === id);
+  if(!rec || newName === rec.name || !newName){
+    if(rec) nameEl.textContent = rec.name || id;
+    return;
+  }
+  try{
+    const r = await fetch('/api/traces/' + encodeURIComponent(id), {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name: newName})
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const updated = await r.json();
+    rec.name = updated.name;
+    nameEl.textContent = rec.name;
+  } catch(e){
+    nameEl.textContent = rec.name || id;
+    alert('Rename failed: ' + e.message);
+  }
+}, true);
+
+searchInput.addEventListener('input', render);
+sortSelect.addEventListener('change', render);
+
+load();
+// Refresh in case the user records something in another tab.
+setInterval(load, 5000);
+</script>
+</body>
+</html>

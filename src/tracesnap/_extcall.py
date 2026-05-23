@@ -57,7 +57,8 @@ def install():
                           "verb": request.method, "target": request.url,
                           "started_ts": started, "ended_ts": ended,
                           "duration_ms": round((ended - started) / 1_000_000, 2),
-                          "status": status, "line": line, "parent_seq": parent}
+                          "status": status, "line": line, "file": afile,
+                          "parent_seq": parent}
                     if err is not None:
                         ev["error"] = err
                     sess.emit(**ev)
@@ -99,7 +100,8 @@ def install():
                           "verb": verb, "target": target,
                           "started_ts": started, "ended_ts": ended,
                           "duration_ms": round((ended - started) / 1_000_000, 2),
-                          "status": status, "line": line, "parent_seq": parent}
+                          "status": status, "line": line, "file": afile,
+                          "parent_seq": parent}
                     if err is not None:
                         ev["error"] = err
                     sess.emit(**ev)

@@ -98,7 +98,27 @@ main{
   display:flex; flex-direction:column; min-height:0 }
 .panel .cap{ font:600 11.5px "Hanken Grotesk",sans-serif; letter-spacing:.1em;
   text-transform:uppercase; color:var(--accent); padding:13px 16px 8px;
-  border-bottom:1px solid var(--faint); background:var(--inset); flex:none }
+  border-bottom:1px solid var(--faint); background:var(--inset); flex:none;
+  display:flex; align-items:center; gap:10px }
+.panel .cap .file-label{ margin-left:auto; font:500 11px "JetBrains Mono",monospace;
+  color:var(--ink-2); text-transform:none; letter-spacing:0; }
+.panel .cap .file-label.swapped{ color:var(--accent) }
+.panel .cap .file-label.pinned::before{ content:"📌 "; font-size:10px }
+.file-tabs{ display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+  padding:7px 12px; border-bottom:1px solid var(--faint);
+  background:var(--card); flex:none }
+.file-tabs:empty{ display:none }
+.file-tab{ font:500 11.5px "JetBrains Mono",monospace; color:var(--ink-2);
+  background:var(--inset); border:1px solid var(--faint); border-radius:7px;
+  padding:3px 9px; cursor:pointer; user-select:none;
+  transition:border-color .15s, color .15s, background .15s }
+.file-tab:hover{ border-color:var(--accent-line); color:var(--ink) }
+.file-tab.active{ background:var(--accent-soft); color:var(--accent);
+  border-color:var(--accent-line); font-weight:600 }
+.file-tab.pinned::after{ content:" 📌"; font-size:10px }
+.file-tabs.playing .file-tab{ opacity:.45; cursor:default; pointer-events:none }
+.file-tabs .hint{ font:500 10.5px "Hanken Grotesk",sans-serif; color:var(--ink-2);
+  margin-left:auto; letter-spacing:.04em; text-transform:uppercase; opacity:.7 }
 .panel > *:not(.cap){ overflow:auto; min-height:0 }
 
 /* code (left) */
@@ -221,6 +241,7 @@ footer{ position:sticky; bottom:0; background:var(--card);
 <header>
   <h1>Trace Simulator</h1>
   <span class="sub">flow drawing &middot; record once &middot; replay anywhere</span>
+  <a class="loadbtn" href="home.html">&larr; TraceSnap</a>
   <a class="loadbtn" href="player.html">&uarr; Text view</a>
   <a class="loadbtn" href="call_graph.html">&uarr; Call graph</a>
   <a class="loadbtn" href="event_graph.html">&uarr; Event graph</a>
@@ -231,6 +252,23 @@ footer{ position:sticky; bottom:0; background:var(--card);
     <button class="loadbtn" id="records-btn">Records &#x25BE;</button>
     <div class="records-list" id="records-list"></div>
   </div>
+  <div class="records-menu">
+    <button class="loadbtn" id="dl-btn" title="Export the current diagram">Download &#x25BE;</button>
+    <div class="records-list" id="dl-menu">
+      <div class="record-row" data-fmt="svg">
+        <div class="info">
+          <div class="record-name">Download SVG</div>
+          <div class="record-meta">vector &middot; scalable &middot; embed in PRs</div>
+        </div>
+      </div>
+      <div class="record-row" data-fmt="png">
+        <div class="info">
+          <div class="record-name">Download PNG</div>
+          <div class="record-meta">raster &middot; 2&times; HiDPI &middot; ready for Slack</div>
+        </div>
+      </div>
+    </div>
+  </div>
   <button class="loadbtn" id="load">Load trace.json</button>
   <input type="file" id="file" accept=".json" hidden>
   <span class="kbd"><b>&larr;</b><b>&rarr;</b> step <b>space</b> play</span>
@@ -238,7 +276,8 @@ footer{ position:sticky; bottom:0; background:var(--card);
 
 <main>
   <section class="panel source">
-    <div class="cap">Source</div>
+    <div class="cap">Source<span class="file-label" id="file-label" title=""></span></div>
+    <div class="file-tabs" id="file-tabs"></div>
     <div id="code"></div>
   </section>
   <section class="panel">
@@ -301,10 +340,83 @@ function svg(tag, attrs, parent){
 }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-let trace = {events:[],session:{}}, events = [], lines = [], cur = 0, timer = null;
-let structureByFile = {}, primaryFile = null;
-let funcByName = {}, childrenByParent = {};
+let trace = {events:[],session:{}}, events = [], cur = 0, timer = null;
+let linesByFile = {}, structureByFile = {}, primaryFile = null, currentFile = null;
+let funcByFile = {}, childrenByParentByFile = {};
 let exceptionSeqs = [];
+let userPinnedFile = null;   // when set, overrides auto-follow
+
+function renderFileTabs(){
+  const wrap = document.getElementById('file-tabs');
+  if(!wrap) return;
+  const paths = Object.keys(linesByFile);
+  if(paths.length <= 1){ wrap.innerHTML = ''; return; }
+  // Ensure the primary file leads the list, then sort the rest by basename.
+  const ordered = [primaryFile].concat(
+    paths.filter(p => p !== primaryFile).sort((a,b) =>
+      fileBasename(a).localeCompare(fileBasename(b))));
+  wrap.innerHTML = ordered.map(p =>
+    '<span class="file-tab" data-path="'+esc(p)+'" title="'+esc(p)+'">'+
+    esc(fileBasename(p))+'</span>').join('') +
+    '<span class="hint">click to pin · click again to follow</span>';
+  wrap.querySelectorAll('.file-tab').forEach(t => {
+    t.addEventListener('click', () => {
+      if(timer) return;   // tabs are inert during play
+      const p = t.dataset.path;
+      if(userPinnedFile === p){
+        userPinnedFile = null;   // clicking the pinned tab again resumes auto-follow
+      } else {
+        userPinnedFile = p;
+        // Time-travel cur to a step where the pinned file is actually executing
+        // so the SIMULATOR panel also lines up with the pinned source.
+        cur = jumpToLastEventInFile(p, cur);
+        document.getElementById('cur').textContent = cur;
+        document.getElementById('scrub').value = cur;
+      }
+      render();
+    });
+  });
+}
+
+// Find the last event whose file matches `file`, looking backward from
+// `fromCur`. If nothing found in [0..fromCur], search forward. Returns
+// `fromCur` if the file has no events at all.
+function jumpToLastEventInFile(file, fromCur){
+  const last = Math.min(fromCur, events.length-1);
+  for(let i = last; i >= 0; i--){
+    if(events[i] && events[i].file === file) return i;
+  }
+  for(let i = last+1; i < events.length; i++){
+    if(events[i] && events[i].file === file) return i;
+  }
+  return fromCur;
+}
+
+function updateFileTabsHighlight(){
+  const wrap = document.getElementById('file-tabs');
+  if(wrap) wrap.classList.toggle('playing', !!timer);
+  document.querySelectorAll('#file-tabs .file-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.path === currentFile);
+    t.classList.toggle('pinned', userPinnedFile === t.dataset.path);
+  });
+}
+
+function fileBasename(p){
+  if(!p) return '';
+  const s = String(p).replace(/\\/g, '/');
+  const i = s.lastIndexOf('/');
+  return i >= 0 ? s.slice(i+1) : s;
+}
+function fileStem(p){
+  const b = fileBasename(p);
+  return b.endsWith('.py') ? b.slice(0, -3) : b;
+}
+// Prefix a function name with the file stem when the trace has multiple
+// files (so `Add.compute`, `Subtract.compute` etc. don't all look identical).
+function qualifyFunc(func, file){
+  if(!file || Object.keys(linesByFile).length <= 1) return func;
+  return fileStem(file) + '.' + func;
+}
 
 function load(t){
   if(!t || !Array.isArray(t.events)){
@@ -313,16 +425,33 @@ function load(t){
   }
   trace = t;
   events = t.events;
-  lines = ((t.session && t.session.source) || '').replace(/\n$/,'').split('\n');
   structureByFile = (t.session && t.session.structure_by_file) || {};
   primaryFile = Object.keys(structureByFile)[0] || null;
-  funcByName = {}; childrenByParent = {};
-  const nodes = primaryFile ? structureByFile[primaryFile] : [];
-  for(const n of nodes){
-    if(n.kind === 'function') funcByName[n.name] = n;
-    const key = n.parent || '__root__';
-    (childrenByParent[key] = childrenByParent[key] || []).push(n);
+  // Sources: prefer the multi-file dict; fall back to legacy single-file `source`.
+  const sourcesByFile = (t.session && t.session.sources_by_file) || null;
+  linesByFile = {};
+  if(sourcesByFile){
+    for(const path in sourcesByFile){
+      linesByFile[path] = (sourcesByFile[path] || '').replace(/\n$/,'').split('\n');
+    }
   }
+  if(!Object.keys(linesByFile).length && primaryFile){
+    linesByFile[primaryFile] = ((t.session && t.session.source) || '').replace(/\n$/,'').split('\n');
+  }
+  // Per-file structure lookup tables.
+  funcByFile = {}; childrenByParentByFile = {};
+  for(const path in structureByFile){
+    const fn = {}, kids = {};
+    for(const n of structureByFile[path]){
+      if(n.kind === 'function') fn[n.name] = n;
+      const key = n.parent || '__root__';
+      (kids[key] = kids[key] || []).push(n);
+    }
+    funcByFile[path] = fn;
+    childrenByParentByFile[path] = kids;
+  }
+  currentFile = primaryFile;
+  userPinnedFile = null;
   cur = 0;
   exceptionSeqs = events.filter(e => e.type === 'exception').map(e => e.seq);
   document.getElementById('tot').textContent = Math.max(events.length-1, 0);
@@ -335,16 +464,26 @@ function load(t){
                          (exceptionSeqs.length>1?'s':'');
     } else { excBtn.hidden = true; }
   }
+  renderFileTabs();
   renderCode();
   render();
 }
 
 function renderCode(){
   const el = document.getElementById('code');
+  const lines = linesByFile[currentFile] || [];
   el.innerHTML = lines.map((ln,i)=>(
     '<div class="row" data-line="'+(i+1)+'"><span class="bar"></span>'+
     '<span class="ln">'+(i+1)+'</span><span class="src">'+(esc(ln)||' ')+'</span></div>'
   )).join('');
+  const lbl = document.getElementById('file-label');
+  if(lbl){
+    lbl.textContent = fileBasename(currentFile);
+    lbl.title = currentFile || '';
+    lbl.classList.toggle('swapped', !!(currentFile && currentFile !== primaryFile));
+    lbl.classList.toggle('pinned', !!userPinnedFile);
+  }
+  updateFileTabsHighlight();
 }
 
 // Fold events[0..cur] into per-frame state. Innermost frame is last.
@@ -356,7 +495,8 @@ function compute(){
     const e = events[i];
     if(!e) continue;
     if(e.type === 'call'){
-      const fr = {seq:e.seq, func:e.func, line:e.line, depth:e.depth,
+      const fr = {seq:e.seq, func:e.func, file:e.file || primaryFile,
+                  line:e.line, depth:e.depth,
                   vars:{}, lastLine:e.line, lastBranch:{}, loopIter:{}};
       for(const k in (e.args||{})) fr.vars[k] = {value:e.args[k], kind:'arg', seq:e.seq};
       stack.push(fr);
@@ -373,7 +513,15 @@ function compute(){
       const f = stack[stack.length-1]; if(!f) continue;
       f.loopIter[e.node_id] = e.iteration + 1;
     } else if(e.type === 'return'){
-      stack.pop();
+      // If this return IS the current step, keep the frame visible with its
+      // final locals + return value so the user can inspect them. We only
+      // pop once the user steps past the return.
+      if(i === cur){
+        const f = stack[stack.length-1];
+        if(f){ f.returned = true; f.returnValue = e.value; }
+      } else {
+        stack.pop();
+      }
     } else if(e.type === 'extcall'){
       if(i === cur) extcallHere = e;
     }
@@ -398,7 +546,10 @@ const VAR_CHIP_GAP = 8;
 const FRAME_GAP = 22;
 const ARROW_LEN = 12;      // visible arrow stroke length inside NODE_GAP
 
-function srcLine(lineno){ return (lines[lineno-1] || '').trim(); }
+function srcLineIn(file, lineno){
+  const arr = linesByFile[file] || [];
+  return (arr[lineno-1] || '').trim();
+}
 function truncate(s, n){ return s.length > n ? s.slice(0, n-1) + '…' : s; }
 
 function isLineInside(node, line){
@@ -424,7 +575,7 @@ function layoutStatement(node, frame){
     const g = svg('g', {transform:`translate(${x},${y})`}, parent);
     svg('rect', {x:0, y:0, width:w, height:STMT_H, rx:6, ry:6,
                  class:'stmt-bg' + (active ? ' active' : '')}, g);
-    const ln = srcLine(node.lineno) || '';
+    const ln = srcLineIn(frame.file, node.lineno) || '';
     const txt = truncate(ln, Math.floor((w-22)/7));
     svg('text', {x:12, y:21, class:'stmt-label' + (active ? '' : ' muted')}, g).textContent = txt;
   }
@@ -434,7 +585,8 @@ function layoutStatement(node, frame){
 // Layout a branch/loop container. Recursively lays out children and stacks
 // them top-to-bottom with downward flow arrows in between.
 function layoutContainer(node, frame, widthAvail){
-  const children = (childrenByParent[node.id] || [])
+  const kidsByParent = childrenByParentByFile[frame.file] || {};
+  const children = (kidsByParent[node.id] || [])
     .filter(c => c.kind !== 'function')
     .sort((a,b)=>a.lineno-b.lineno);
 
@@ -459,7 +611,7 @@ function layoutContainer(node, frame, widthAvail){
     svg('text', {x:12, y:22, class:glyCls}, g).textContent = gly;
     const labelCls = isLoop ? 'loop-label' : 'branch-label';
     const labelMax = w - 40 - (isLoop ? 60 : 70);
-    const labelText = truncate(srcLine(node.lineno) || node.id, Math.floor(labelMax / 7));
+    const labelText = truncate(srcLineIn(frame.file, node.lineno) || node.id, Math.floor(labelMax / 7));
     svg('text', {x:32, y:22, class:labelCls}, g).textContent = labelText;
 
     // Right-side badge
@@ -507,8 +659,10 @@ function layoutNode(node, frame, widthAvail){
 
 // Layout one stack frame. Returns {width, height, render(parent)}.
 function layoutFrame(frame, isInnermost, changedHereName){
-  const fn = funcByName[frame.func];
-  const children = fn ? (childrenByParent[fn.id] || [])
+  const funcs = funcByFile[frame.file] || {};
+  const kidsByParent = childrenByParentByFile[frame.file] || {};
+  const fn = funcs[frame.func];
+  const children = fn ? (kidsByParent[fn.id] || [])
                           .filter(c => c.kind !== 'function')
                           .sort((a,b)=>a.lineno-b.lineno)
                        : [];
@@ -532,9 +686,18 @@ function layoutFrame(frame, isInnermost, changedHereName){
     // Frame header
     const args = Object.keys(frame.vars).filter(n => frame.vars[n].kind === 'arg');
     svg('text', {x:16, y:25, class:'frame-label'}, g).textContent =
-      frame.func + '(' + args.join(', ') + ')';
+      qualifyFunc(frame.func, frame.file) + '(' + args.join(', ') + ')';
+    let subLabel;
+    if(frame.returned){
+      const v = frame.returnValue;
+      const repr = (v && v.repr != null) ? String(v.repr) : 'None';
+      const shown = (v && v.redacted) ? '<hidden>' : truncate(repr, 28);
+      subLabel = '↩ returned ' + shown;
+    } else {
+      subLabel = isInnermost ? 'now running' : 'caller';
+    }
     svg('text', {x:FRAME_W-14, y:25, class:'frame-sub', 'text-anchor':'end'}, g).textContent =
-      isInnermost ? 'now running' : 'caller';
+      subLabel;
 
     // Structural body with arrows between siblings
     const arrowX = FRAME_PAD + flowW/2;
@@ -584,13 +747,13 @@ function explain(e){
     case 'call': {
       const args = Object.entries(e.args || {})
         .map(([k,v]) => k + '=' + valRepr(v)).join(', ');
-      return ['call', `Entering ${e.func}(${args})`];
+      return ['call', `Entering ${qualifyFunc(e.func, e.file)}(${args})`];
     }
     case 'return': {
-      return ['return', `Finishing ${e.func || ''} — returns ${valRepr(e.value)}`];
+      return ['return', `Finishing ${qualifyFunc(e.func || '', e.file)} — returns ${valRepr(e.value)}`];
     }
     case 'line': {
-      const ln = (lines[e.line-1] || '').trim();
+      const ln = srcLineIn(e.file || currentFile, e.line);
       return ['line', `Running line ${e.line}: ${truncate(ln, 70)}`];
     }
     case 'assign': {
@@ -605,7 +768,7 @@ function explain(e){
       return ['extcall', `Calling out: ${e.verb} ${e.target} → ${e.status} in ${e.duration_ms}ms`];
     case 'exception':
       return ['exception',
-        `⚠ ${e.exc_type || 'Exception'}: ${e.message || ''}  ·  in ${e.func || ''} on line ${e.line}`];
+        `⚠ ${e.exc_type || 'Exception'}: ${e.message || ''}  ·  in ${qualifyFunc(e.func || '', e.file)} on line ${e.line}`];
   }
   return ['', e.type];
 }
@@ -617,11 +780,28 @@ function render(){
 
   const {stack, changedHere, extcallHere, currentEvent} = compute();
 
-  // Left-side source highlight (red for exception, accent otherwise)
+  // Swap the SOURCE pane. While the player is playing, always auto-follow
+  // the active frame; only when stopped/paused does the user's pin take effect.
+  const innermost = stack.length ? stack[stack.length - 1] : null;
+  const pin = timer ? null : userPinnedFile;
+  const wantFile = pin
+                 || (innermost && innermost.file)
+                 || (currentEvent && currentEvent.file)
+                 || primaryFile;
+  if(wantFile && wantFile !== currentFile && linesByFile[wantFile]){
+    currentFile = wantFile;
+    renderCode();
+  } else {
+    updateFileTabsHighlight();   // keep the tab strip in sync even if code didn't change
+  }
+
+  // Left-side source highlight (red for exception, accent otherwise) — but
+  // only when the current event's file matches the file shown in the pane.
   document.querySelectorAll('.row.cur, .row.cur-exc').forEach(r => {
     r.classList.remove('cur'); r.classList.remove('cur-exc');
   });
-  if(currentEvent && currentEvent.line){
+  const sameFile = currentEvent && (!currentEvent.file || currentEvent.file === currentFile);
+  if(currentEvent && currentEvent.line && sameFile){
     const r = document.querySelector('.row[data-line="'+currentEvent.line+'"]');
     if(r){
       r.classList.add(currentEvent.type === 'exception' ? 'cur-exc' : 'cur');
@@ -860,6 +1040,118 @@ render();
     if(e.target.classList && e.target.classList.contains('record-name') && e.key === 'Enter'){
       e.preventDefault(); e.target.blur();
     }
+  });
+})();
+
+// Download menu — exports the SVG canvas as SVG or a 2x-rasterized PNG.
+// Uses getBBox() so the export captures the full diagram regardless of
+// current zoom/pan, and inlines the document's <style> so the file
+// renders standalone.
+(function setupDownload(){
+  const btn = document.getElementById('dl-btn');
+  const menu = document.getElementById('dl-menu');
+  if(!btn || !menu) return;
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    document.querySelectorAll('.records-list.open').forEach(m => {
+      if(m !== menu) m.classList.remove('open');
+    });
+    menu.classList.toggle('open');
+  });
+  document.addEventListener('click', e => {
+    if(!menu.contains(e.target) && e.target !== btn) menu.classList.remove('open');
+  });
+
+  function baseName(){
+    const id = (typeof trace !== 'undefined' && trace && trace.session && trace.session.trace_id)
+      ? trace.session.trace_id : 'tracesnap';
+    const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+    const view = (document.title || 'view').toLowerCase()
+      .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'view';
+    return id + '-' + view + '-' + stamp;
+  }
+
+  function serializeSvg(){
+    const src = document.getElementById('canvas');
+    if(!src) return null;
+    let bx = 0, by = 0, bw = 0, bh = 0;
+    try {
+      const bbox = src.getBBox();
+      bx = bbox.x; by = bbox.y; bw = bbox.width; bh = bbox.height;
+    } catch(_){}
+    if(!bw || !bh){
+      bw = parseFloat(src.getAttribute('width'))  || src.clientWidth  || 800;
+      bh = parseFloat(src.getAttribute('height')) || src.clientHeight || 600;
+    }
+    const pad = 12;
+    bx -= pad; by -= pad; bw += pad*2; bh += pad*2;
+
+    const clone = src.cloneNode(true);
+    clone.setAttribute('width', bw);
+    clone.setAttribute('height', bh);
+    clone.setAttribute('viewBox', bx + ' ' + by + ' ' + bw + ' ' + bh);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+    const paper = getComputedStyle(document.body).backgroundColor || '#FAF7F0';
+    const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    bg.setAttribute('x', bx); bg.setAttribute('y', by);
+    bg.setAttribute('width', bw); bg.setAttribute('height', bh);
+    bg.setAttribute('fill', paper);
+    clone.insertBefore(bg, clone.firstChild);
+
+    const docStyle = document.querySelector('head > style');
+    if(docStyle){
+      const styleEl = document.createElementNS('http://www.w3.org/2000/svg','style');
+      styleEl.textContent = docStyle.textContent;
+      clone.insertBefore(styleEl, clone.firstChild);
+    }
+    return {xml: new XMLSerializer().serializeToString(clone), width: bw, height: bh};
+  }
+
+  function trigger(blob, name){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportSvg(){
+    const out = serializeSvg();
+    if(!out){ alert('Nothing to download yet — load a trace first.'); return; }
+    trigger(new Blob([out.xml], {type:'image/svg+xml;charset=utf-8'}), baseName()+'.svg');
+  }
+
+  function exportPng(){
+    const out = serializeSvg();
+    if(!out){ alert('Nothing to download yet — load a trace first.'); return; }
+    const scale = 2;
+    const url = URL.createObjectURL(new Blob([out.xml], {type:'image/svg+xml;charset=utf-8'}));
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = out.width * scale; c.height = out.height * scale;
+      const ctx = c.getContext('2d');
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0, out.width, out.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => trigger(b, baseName()+'.png'), 'image/png');
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      alert('PNG export failed — try SVG instead.');
+    };
+    img.src = url;
+  }
+
+  menu.addEventListener('click', e => {
+    const row = e.target.closest('.record-row');
+    if(!row) return;
+    menu.classList.remove('open');
+    if(row.dataset.fmt === 'svg') exportSvg();
+    else if(row.dataset.fmt === 'png') exportPng();
   });
 })();
 </script>

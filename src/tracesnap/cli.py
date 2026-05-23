@@ -2,6 +2,7 @@
 Command-line interface: `tracesnap record / view / list / rename / delete`.
 """
 import argparse
+import ast
 import json
 import sys
 from pathlib import Path
@@ -10,6 +11,83 @@ from . import __version__, library
 from ._recorder import start_recording, stop_recording
 from .api import write_trace
 from .server import serve
+
+
+# ---------------------------------------------------------------------------
+# Source-file discovery
+# ---------------------------------------------------------------------------
+_DISCOVERY_LIMIT = 50
+
+
+def _discover_local_sources(entry):
+    """Starting from `entry`, BFS-walk imports and return the set of .py
+    files reachable via `import X` / `from X import …` that live under
+    `entry.parent`. Stdlib / site-packages / anything outside the entry
+    directory is intentionally excluded so the recorder doesn't trace
+    framework noise.
+    """
+    root = entry.parent.resolve()
+    found = [entry.resolve()]
+    seen = {found[0]}
+    queue = [found[0]]
+    while queue and len(found) < _DISCOVERY_LIMIT:
+        current = queue.pop(0)
+        try:
+            tree = ast.parse(current.read_text(encoding="utf-8"), filename=str(current))
+        except (OSError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            names = []
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                # Resolve module-relative bits ("from .pkg import name" / "from pkg import name").
+                # We only care about discovering files inside `root`, so try both the
+                # module name itself and each imported name (which could be a submodule
+                # in the same package).
+                module = node.module or ""
+                if module:
+                    names.append(module)
+                for alias in node.names:
+                    if module:
+                        names.append(f"{module}.{alias.name}")
+                    else:
+                        names.append(alias.name)
+            for dotted in names:
+                resolved = _resolve_module(dotted, root)
+                if resolved is None:
+                    continue
+                if resolved in seen:
+                    continue
+                seen.add(resolved)
+                found.append(resolved)
+                queue.append(resolved)
+                if len(found) >= _DISCOVERY_LIMIT:
+                    break
+    return found
+
+
+def _resolve_module(dotted_name, root):
+    """Map a dotted module name to a .py file under `root`, if any.
+    Tries `root/foo/bar.py` and `root/foo/bar/__init__.py`."""
+    parts = dotted_name.split(".")
+    candidate = root.joinpath(*parts).with_suffix(".py")
+    if candidate.is_file():
+        try:
+            candidate = candidate.resolve()
+        except OSError:
+            return None
+        if root in candidate.parents or candidate.parent == root:
+            return candidate
+    pkg_init = root.joinpath(*parts, "__init__.py")
+    if pkg_init.is_file():
+        try:
+            pkg_init = pkg_init.resolve()
+        except OSError:
+            return None
+        if root in pkg_init.parents or pkg_init.parent == root:
+            return pkg_init
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -32,8 +110,10 @@ def cmd_record(args):
         structure_path = out_path.with_suffix(".structure.json") if args.structure_out is None \
                          else Path(args.structure_out).resolve()
 
+    discovered = _discover_local_sources(target)
+    source_files = [str(p) for p in discovered]
     start_recording(trace_id=args.id, kind=args.kind,
-                    source_files=[str(target)], redact_names=redact)
+                    source_files=source_files, redact_names=redact)
     code = compile(src, str(target), "exec")
     exec_error = None
     try:
@@ -75,6 +155,9 @@ def cmd_record(args):
     else:
         print(f"tracesnap: recorded {len(events)} events", file=out_stream)
     print(f"tracesnap: event types: {counts}", file=out_stream)
+    if len(source_files) > 1:
+        print(f"tracesnap: traced {len(source_files)} files "
+              f"(entrypoint + {len(source_files) - 1} sibling)", file=out_stream)
     if out_path:
         print(f"tracesnap: wrote {out_path}", file=out_stream)
     if meta:
@@ -181,9 +264,11 @@ def build_parser():
     v = sub.add_parser("view", help="Open a trace in the player. Without args, browse the library.")
     v.add_argument("path", nargs="?", default=None,
                    help="Library id, exact name, or path to a trace.json. Omit to browse all.")
-    v.add_argument("--view", choices=("text", "simulator", "graph", "call_graph",
+    v.add_argument("--view", choices=("home", "text", "simulator", "graph", "call_graph",
                                        "event_graph", "events", "record"),
-                   default="call_graph", help="Which player view to open first.")
+                   default=None,
+                   help="Which page to open first. Default: 'home' when browsing the "
+                        "library, 'call_graph' when a specific trace is given.")
     v.add_argument("--port", type=int, default=0,
                    help="Port for the local server (default: random free port).")
     v.add_argument("--no-browser", action="store_true",

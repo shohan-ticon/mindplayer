@@ -40,7 +40,7 @@ except ImportError:                               # pragma: no cover
 from . import library
 
 
-_PLAYER_HTMLS = ("player.html", "simulator.html", "call_graph.html",
+_PLAYER_HTMLS = ("home.html", "player.html", "simulator.html", "call_graph.html",
                  "event_graph.html", "record.html")
 _SCAN_IGNORE_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules",
                      "dist", "build", ".tox", ".pytest_cache", ".mypy_cache",
@@ -60,7 +60,7 @@ def _stage_player_files(dst):
             (dst / name).write_bytes(f.read())
 
 
-def serve(trace_path=None, target_id=None, view="call_graph",
+def serve(trace_path=None, target_id=None, view=None,
           port=0, open_browser=True, scan_root=None):
     """Spin up the local server.
 
@@ -72,6 +72,7 @@ def serve(trace_path=None, target_id=None, view="call_graph",
       `.py` files. Defaults to the current working directory.
     """
     view_to_html = {
+        "home": "home.html",
         "text": "player.html",
         "simulator": "simulator.html",
         "graph": "call_graph.html",
@@ -80,6 +81,10 @@ def serve(trace_path=None, target_id=None, view="call_graph",
         "events": "event_graph.html",
         "record": "record.html",
     }
+    # Default: open the trace in the call graph if one was specified, otherwise
+    # land on the TraceSnap home page so the user can browse the library.
+    if view is None:
+        view = "call_graph" if (target_id or trace_path) else "home"
     if view not in view_to_html:
         raise ValueError(f"unknown view: {view!r}. Pick one of {sorted(view_to_html)}")
     html_name = view_to_html[view]
@@ -368,6 +373,14 @@ def _make_handler(directory, *, scan_root=None):
             api = self._match_api()
             if api is not None:
                 self._handle_api(api, "GET")
+                return
+            # Root URL lands on the TraceSnap home page.
+            path_only = self.path.split("?", 1)[0]
+            if path_only in ("/", "/index.html"):
+                self.send_response(302)
+                self.send_header("Location", "/home.html")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
                 return
             super().do_GET()
 
